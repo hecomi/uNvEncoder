@@ -507,7 +507,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   encoder: {fileID: 2114864539}
   texture: {fileID: 8400000, guid: 314a1f1bf10d90f4eb4025543112bd83, type: 2}
-  forceIdrFrame: 1
+  forceIdrFrame: 0
 --- !u!1 &1602141287
 GameObject:
   m_ObjectHideFlags: 0
@@ -657,9 +657,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ae92fb89500a024088102c416bc5426, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  multithreaded: 0
-  width: 256
-  height: 256
+  width: 2048
+  height: 2048
   frameRate: 60
   onEncoded:
     m_PersistentCalls:

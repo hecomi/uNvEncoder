@@ -26,10 +26,14 @@ public static class Lib
     public static extern int GetFrameRate();
     [DllImport(dllName, EntryPoint = "uNvEncoderEncode")]
     public static extern bool Encode(IntPtr texturePtr, bool forceIdrFrame);
-    [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedSize")]
-    public static extern int GetEncodedSize();
-    [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedData")]
-    public static extern IntPtr GetEncodedData();
+    [DllImport(dllName, EntryPoint = "uNvEncoderCopyEncodedData")]
+    public static extern void CopyEncodedData();
+    [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedDataCount")]
+    public static extern int GetEncodedDataCount();
+    [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedDataSize")]
+    public static extern int GetEncodedDataSize(int i);
+    [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedDataBuffer")]
+    public static extern IntPtr GetEncodedDataBuffer(int i);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetLastError")]
     private static extern IntPtr GetLastErrorInternal();
 
