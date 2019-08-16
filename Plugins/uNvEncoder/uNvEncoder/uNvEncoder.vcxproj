@@ -162,10 +162,14 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Common.cpp" />
+    <ClCompile Include="Encoder.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Nvenc.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Common.h" />
+    <ClInclude Include="Encoder.h" />
     <ClInclude Include="Nvenc.h" />
     <ClInclude Include="nvEncodeAPI.h" />
   </ItemGroup>

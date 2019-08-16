@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Assertions;
 using System.Threading.Tasks;
 
 namespace uNvEncoder
@@ -7,7 +8,8 @@ namespace uNvEncoder
 
 public class uNvEncoderEncode : MonoBehaviour
 {
-    public bool multithreaded = true;
+    static uNvEncoderEncode instance;
+
     public int width = 256;
     public int height = 256;
     public int frameRate = 60;
@@ -20,12 +22,27 @@ public class uNvEncoderEncode : MonoBehaviour
 
     void OnEnable()
     {
+        Assert.IsNull(instance, "Multiple uNvEncoderEncode instance not allowed.");
+        instance = this;
         InitializeEncoder();
     }
 
     void OnDisable()
     {
         FinalizeEncoder();
+        instance = null;
+    }
+
+    void Update()
+    {
+        Lib.CopyEncodedData();
+
+        for (int i = 0; i < Lib.GetEncodedDataCount(); ++i)
+        {
+            var size = Lib.GetEncodedDataSize(i);
+            var data = Lib.GetEncodedDataBuffer(i);
+            onEncoded.Invoke(data, size);
+        }
     }
 
     public void InitializeEncoder()
@@ -58,89 +75,39 @@ public class uNvEncoderEncode : MonoBehaviour
             frameRate == Lib.GetFrameRate();
     }
 
-    public void Encode(Texture texture, bool forceIdrFrame)
+    public bool Encode(Texture texture, bool forceIdrFrame)
     {
         if (!texture)
         {
             Debug.LogError("The given texture is invalid.");
-            return;
+            return false;
         }
 
         var ptr = texture.GetNativeTexturePtr();
-        Encode(ptr, forceIdrFrame);
+        return Encode(ptr, forceIdrFrame);
     }
 
-    public void Encode(System.IntPtr ptr, bool forceIdrFrame)
+    public bool Encode(System.IntPtr ptr, bool forceIdrFrame)
     {
         if (ptr == System.IntPtr.Zero)
         {
             Debug.LogError("The given texture pointer is invalid.");
-            return;
+            return false;
         }
 
         if (!Lib.IsInitialized())
         {
             Debug.LogError("uNvEncoder has not been initialized yet.");
-            return;
+            return false;
         }
 
         if (!CheckEncoderSetting())
         {
             Debug.LogError("Encode setting has changed. Please call ReinitializeEncoder().");
-            return;
+            return false;
         }
 
-        _Encode(ptr, forceIdrFrame);
-    }
-
-    async void _Encode(System.IntPtr ptr, bool forceIdrFrame)
-    {
-        bool result = false;
-
-        if (encodeTask_ != null && encodeTask_.Status == TaskStatus.Running)
-        {
-            Debug.LogError("The previous encode has not finished yet.");
-            return;
-        }
-
-        if (multithreaded)
-        {
-            encodeTask_ = Task.Run(() => CallEncodeApi(ptr, forceIdrFrame));
-            result = await encodeTask_;
-        }
-        else
-        {
-            result = CallEncodeApi(ptr, forceIdrFrame);
-        }
-
-        if (result) 
-        {
-            InvokeCallback();
-            Debug.Log("Encode() succeeded.");
-        }
-        else
-        {
-            Debug.Log("Encode() failed.");
-        }
-    }
-
-    bool CallEncodeApi(System.IntPtr ptr, bool forceIdrFrame)
-    {
-        var result = Lib.Encode(ptr, forceIdrFrame);
-        if (!result)
-        {
-            Debug.LogError(Lib.GetLastError());
-        }
-        return result;
-    }
-
-    void InvokeCallback()
-    {
-        if (onEncoded == null) return;
-
-        var size = Lib.GetEncodedSize();
-        var data = Lib.GetEncodedData();
-        onEncoded.Invoke(data, size);
+        return Lib.Encode(ptr, forceIdrFrame);
     }
 }
 

@@ -2,17 +2,25 @@
 #include <string>
 #include <d3d11.h>
 #include <IUnityInterface.h>
-#include <IUnityGraphics.h>
-#include <IUnityGraphicsD3D11.h>
-#include "Nvenc.h"
+#include "Encoder.h"
+
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+
+
+using namespace uNvEncoder;
+
+
+namespace uNvEncoder
+{
+    IUnityInterfaces *g_unity = nullptr;
+}
+
 
 namespace
 {
-
-std::unique_ptr<uNvEncoder::Nvenc> g_nvenc;
-IUnityInterfaces* g_unity = nullptr;
-std::string g_lastError;
-
+    std::unique_ptr<Encoder> g_encoder;
+    std::string g_lastError;
 }
 
 
@@ -34,17 +42,16 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API UnityPluginUnload()
 
 UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderInitialize(int width, int height, int frameRate)
 {
-    if (g_nvenc || !g_unity) return false;
+    if (g_encoder || !g_unity) return false;
 
-    uNvEncoder::NvencDesc desc;
+    EncoderDesc desc;
     desc.width = width;
     desc.height = height;
     desc.frameRate = frameRate;
-    desc.d3d11Device = g_unity->Get<IUnityGraphicsD3D11>()->GetDevice();
 
     try
     {
-        g_nvenc = std::make_unique<uNvEncoder::Nvenc>(desc);
+        g_encoder = std::make_unique<Encoder>(desc);
     }
     catch (const std::exception &e)
     {
@@ -58,11 +65,11 @@ UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderInitialize(int width, 
 
 UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderFinalize()
 {
-    if (!g_nvenc) return false;
+    if (!g_encoder) return false;
 
     try
     {
-        g_nvenc.reset();
+        g_encoder.reset();
     }
     catch (const std::exception &e)
     {
@@ -76,66 +83,84 @@ UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderFinalize()
 
 UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderIsInitialized()
 {
-    return g_nvenc != nullptr;
+    return g_encoder != nullptr;
 }
 
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetWidth()
 {
-    if (!g_nvenc) return 0;
+    if (!g_encoder) return 0;
 
-    return static_cast<int>(g_nvenc->GetWidth());
+    return static_cast<int>(g_encoder->GetWidth());
 }
 
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight()
 {
-    if (!g_nvenc) return 0;
+    if (!g_encoder) return 0;
 
-    return static_cast<int>(g_nvenc->GetHeight());
+    return static_cast<int>(g_encoder->GetHeight());
 }
 
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate()
 {
-    if (!g_nvenc) return 0;
+    if (!g_encoder) return 0;
 
-    return static_cast<int>(g_nvenc->GetFrameRate());
+    return static_cast<int>(g_encoder->GetFrameRate());
 }
 
 
-UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(ID3D11Texture2D *texture, bool forceIdrFrame)
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderEncode(ID3D11Texture2D *texture, bool forceIdrFrame)
 {
-    if (!g_nvenc) return false;
+    if (!g_encoder) return;
 
-    bool result;
     try
     {
-        result = g_nvenc->Encode(texture, forceIdrFrame);
+        g_encoder->Encode(texture, forceIdrFrame);
     }
     catch (const std::exception &e)
     {
         g_lastError = e.what();
-        return false;
     }
-
-    return result;
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedSize()
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderCopyEncodedData()
 {
-    if (!g_nvenc) return 0;
+    if (!g_encoder) return;
 
-    return static_cast<int>(g_nvenc->GetEncodedSize());
+    return g_encoder->CopyEncodedDataList();
 }
 
 
-UNITY_INTERFACE_EXPORT const void * UNITY_INTERFACE_API uNvEncoderGetEncodedData()
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataCount()
 {
-    if (!g_nvenc) return nullptr;
+    if (!g_encoder) return 0;
 
-    return g_nvenc->GetEncodedData();
+    return static_cast<int>(g_encoder->GetEncodedDataList().size());
+}
+
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataSize(int i)
+{
+    if (!g_encoder) return 0;
+
+    const auto &list = g_encoder->GetEncodedDataList();
+    if (i < 0 || i >= static_cast<int>(list.size())) return 0;
+
+    return static_cast<int>(list.at(i).buffer.size());
+}
+
+
+UNITY_INTERFACE_EXPORT const void * UNITY_INTERFACE_API uNvEncoderGetEncodedDataBuffer(int i)
+{
+    if (!g_encoder) return nullptr;
+
+    const auto &list = g_encoder->GetEncodedDataList();
+    if (i < 0 || i >= static_cast<int>(list.size())) return nullptr;
+
+    return list.at(i).buffer.data();
 }
 
 

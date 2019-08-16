@@ -25,7 +25,10 @@ public class Encoder : MonoBehaviour
         for (;;)
         {
             yield return new WaitForEndOfFrame();
-            encoder.Encode(texture, forceIdrFrame);
+            if (!encoder.Encode(texture, forceIdrFrame))
+            {
+                Debug.LogError("Encode() failed.");
+            }
         }
     }
 }
