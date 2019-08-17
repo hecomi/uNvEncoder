@@ -24,6 +24,8 @@ public static class Lib
     public static extern int GetHeight();
     [DllImport(dllName, EntryPoint = "uNvEncoderGetFrameRate")]
     public static extern int GetFrameRate();
+    [DllImport(dllName, EntryPoint = "uNvEncoderIsEncoding")]
+    public static extern bool IsEncoding();
     [DllImport(dllName, EntryPoint = "uNvEncoderEncode")]
     public static extern bool Encode(IntPtr texturePtr, bool forceIdrFrame);
     [DllImport(dllName, EntryPoint = "uNvEncoderCopyEncodedData")]

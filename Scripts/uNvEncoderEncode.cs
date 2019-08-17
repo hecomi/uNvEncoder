@@ -20,6 +20,11 @@ public class uNvEncoderEncode : MonoBehaviour
 
     Task<bool> encodeTask_;
 
+    public bool isEncoding
+    {
+        get { return Lib.IsEncoding(); }
+    }
+
     void OnEnable()
     {
         Assert.IsNull(instance, "Multiple uNvEncoderEncode instance not allowed.");
@@ -37,7 +42,8 @@ public class uNvEncoderEncode : MonoBehaviour
     {
         Lib.CopyEncodedData();
 
-        for (int i = 0; i < Lib.GetEncodedDataCount(); ++i)
+        int n = Lib.GetEncodedDataCount();
+        for (int i = 0; i < n; ++i)
         {
             var size = Lib.GetEncodedDataSize(i);
             var data = Lib.GetEncodedDataBuffer(i);
