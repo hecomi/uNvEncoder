@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <atomic>
+#include <memory>
 #include <d3d11.h>
 #include <wrl/client.h>
 #include "nvEncodeAPI.h"
@@ -15,10 +16,16 @@ namespace uNvEncoder
 struct NvencDesc
 {
     ComPtr<ID3D11Device> d3d11Device; 
-    uint32_t width; 
-    uint32_t height;
-    uint32_t frameRate;
-    bool async;
+    uint32_t width = 1920; 
+    uint32_t height = 1080;
+    uint32_t frameRate = 60;
+};
+
+
+struct NvencEncodedData
+{
+    std::unique_ptr<uint8_t[]> buffer;
+    uint32_t size = 0;
 };
 
 
@@ -29,16 +36,15 @@ public:
     ~Nvenc();
     bool IsValid() const { return encoder_ != nullptr; }
     bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
-    void WaitForCompletion(DWORD duration);
+    bool WaitForCompletion(DWORD duration);
     bool IsEncoding() const { return isEncoding_; }
-    void GetEncodedData(std::vector<uint8_t> &data);
+    bool GetEncodedData(NvencEncodedData &data);
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
-    const bool IsAsync() const { return desc_.async; }
 
 private:
-    NVENCSTATUS LoadModule();
+    bool LoadModule();
     void UnloadModule();
 
     void OpenEncodeSession();
@@ -48,12 +54,14 @@ private:
     void DestroyCompletionEvent();
     void CreateBitstreamBuffer();
     void DestroyBitstreamBuffer();
+    void CreateInputTexture();
     void RegisterResource();
     void UnregisterResource();
     void MapInputResource();
     void UnmapInputResource();
 
-    bool EncodeFrame(bool forceIdrFrame);
+    void CopyToInputTexture(const ComPtr<ID3D11Texture2D> &texture);
+    bool EncodeInputTexture(bool forceIdrFrame);
     void EndEncode();
     void SendEOS();
 
@@ -61,10 +69,10 @@ private:
     HMODULE module_ = nullptr;
     NV_ENCODE_API_FUNCTION_LIST nvenc_ = { 0 };
     void *encoder_ = nullptr;
+    ComPtr<ID3D11Texture2D> inputTexture_ = nullptr;
     NV_ENC_INPUT_PTR inputResource_ = nullptr;
     NV_ENC_OUTPUT_PTR bitstreamBuffer_ = nullptr;
     NV_ENC_REGISTERED_PTR registeredResource_ = nullptr;
-    ComPtr<ID3D11Texture2D> inputTexture_ = nullptr;
     void *completionEvent_ = nullptr;
 
     std::atomic<bool> isEncoding_ = false;

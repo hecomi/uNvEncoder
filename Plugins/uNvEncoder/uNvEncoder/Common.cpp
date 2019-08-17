@@ -23,4 +23,21 @@ ID3D11Device * GetUnityDevice()
 }
 
 
+ScopedTimer::ScopedTimer(const StartFunc &startFunc, const EndFunc &endFunc)
+    : func_(endFunc)
+    , start_(std::chrono::high_resolution_clock::now())
+{
+    startFunc();
+}
+
+
+ScopedTimer::~ScopedTimer()
+{
+    using namespace std::chrono;
+    const auto end = high_resolution_clock::now();
+    const auto time = duration_cast<microseconds>(end - start_);
+    func_(time);
+}
+
+
 }

@@ -4,7 +4,6 @@
 #include <vector>
 #include <memory>
 #include <thread>
-#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <d3d11.h>
@@ -13,6 +12,9 @@
 
 namespace uNvEncoder
 {
+
+
+struct NvencEncodedData;
 
 
 struct EncoderDesc
@@ -26,33 +28,33 @@ struct EncoderDesc
 class Encoder final
 {
 public:
-    struct EncodedData
-    {
-        std::vector<uint8_t> buffer;
-    };
-
     explicit Encoder(const EncoderDesc &desc);
     ~Encoder();
     bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
     void CopyEncodedDataList();
-    const std::vector<EncodedData> & GetEncodedDataList() const;
+    const std::vector<NvencEncodedData> & GetEncodedDataList() const;
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
+    bool IsEncoding() const;
 
 private:
     void CreateNvenc();
     void StartThread();
-    void UpdateData();
+    void WaitForEncodeRequest();
+    void RequestGetEncodedData();
+    void UpdateGetEncodedData();
 
     const EncoderDesc desc_;
     std::unique_ptr<class Nvenc> nvenc_;
-    std::vector<EncodedData> encodedDataList_;
-    std::vector<EncodedData> encodedDataListCopied_;
-    std::thread thread_;
-    mutable std::mutex dataListMutex_;
-    std::atomic<bool> shouldStopThread_ = false;
-    std::atomic<bool> isEncodeRequested_ = false;
+    std::vector<NvencEncodedData> encodedDataList_;
+    std::vector<NvencEncodedData> encodedDataListCopied_;
+    std::thread encodeThread_;
+    std::condition_variable encodeCond_;
+    std::mutex encodeMutex_;
+    std::mutex encodeDataListMutex_;
+    bool shouldStopEncodeThread_ = false;
+    bool isEncoding_ = false;
 };
 
 
