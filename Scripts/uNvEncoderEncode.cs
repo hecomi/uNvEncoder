@@ -20,11 +20,6 @@ public class uNvEncoderEncode : MonoBehaviour
 
     Task<bool> encodeTask_;
 
-    public bool isEncoding
-    {
-        get { return Lib.IsEncoding(); }
-    }
-
     void OnEnable()
     {
         Assert.IsNull(instance, "Multiple uNvEncoderEncode instance not allowed.");
