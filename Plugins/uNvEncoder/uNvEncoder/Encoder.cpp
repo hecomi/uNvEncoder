@@ -14,6 +14,7 @@ Encoder::Encoder(const EncoderDesc &desc)
 {
     UNVENC_FUNC_SCOPED_TIMER
 
+    CreateDevice();
     CreateNvenc();
     StartThread();
 }
@@ -33,12 +34,56 @@ Encoder::~Encoder()
 }
 
 
+void Encoder::CreateDevice()
+{
+    ComPtr<IDXGIDevice1> dxgiDevice;
+    if (FAILED(GetUnityDevice()->QueryInterface(IID_PPV_ARGS(&dxgiDevice)))) 
+    {
+        // TODO: output error
+        return;
+    }
+
+    ComPtr<IDXGIAdapter> dxgiAdapter;
+    if (FAILED(dxgiDevice->GetAdapter(&dxgiAdapter))) 
+    {
+        // TODO: output error
+        return;
+    }
+
+    constexpr auto driverType = D3D_DRIVER_TYPE_UNKNOWN;
+    constexpr auto flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+    constexpr D3D_FEATURE_LEVEL featureLevelsRequested[] =
+    {
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0,
+        D3D_FEATURE_LEVEL_9_3,
+        D3D_FEATURE_LEVEL_9_2,
+        D3D_FEATURE_LEVEL_9_1
+    };
+    constexpr UINT numLevelsRequested = sizeof(featureLevelsRequested) / sizeof(D3D_FEATURE_LEVEL);
+    D3D_FEATURE_LEVEL featureLevelsSupported;
+
+    D3D11CreateDevice(
+        dxgiAdapter.Get(),
+        driverType,
+        nullptr,
+        flags,
+        featureLevelsRequested,
+        numLevelsRequested,
+        D3D11_SDK_VERSION,
+        &device_,
+        &featureLevelsSupported,
+        nullptr);
+}
+
+
 void Encoder::CreateNvenc()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
     NvencDesc desc = { 0 };
-    desc.d3d11Device = GetUnityDevice();
+    desc.d3d11Device = device_;
     desc.width = desc_.width;
     desc.height = desc_.height;
     desc.frameRate = desc_.frameRate;
@@ -62,17 +107,9 @@ void Encoder::StartThread()
 }
 
 
-bool Encoder::IsEncoding() const
-{
-    return isEncoding_ || nvenc_->IsEncoding();
-}
-
-
 bool Encoder::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
 {
     UNVENC_FUNC_SCOPED_TIMER
-
-    if (IsEncoding()) return false;
 
     if (nvenc_->Encode(source, forceIdrFrame))
     {
@@ -100,7 +137,7 @@ void Encoder::RequestGetEncodedData()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    std::unique_lock<std::mutex> lock(encodeMutex_);
+    std::lock_guard<std::mutex> lock(encodeMutex_);
     isEncoding_ = true;
     encodeCond_.notify_one();
 }
@@ -110,11 +147,14 @@ void Encoder::UpdateGetEncodedData()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    NvencEncodedData data;
+    std::vector<NvencEncodedData> data;
     if (nvenc_->GetEncodedData(data))
     {
         std::lock_guard<std::mutex> dataLock(encodeDataListMutex_);
-        encodedDataList_.push_back(std::move(data));
+        for (auto &ed : data)
+        {
+            encodedDataList_.push_back(std::move(ed));
+        }
     }
 
     isEncoding_ = false;

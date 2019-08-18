@@ -52,15 +52,19 @@ void OutputNvencApiError(const std::string &apiName, NVENCSTATUS status)
 
 
 template <class Api, class ...Args>
-bool CallNvencApi(const std::string &apiName, const Api &api, const Args &... args)
+NVENCSTATUS CallNvencApi(const std::string &apiName, const Api &api, const Args &... args)
 {
+    OutputDebugStringA(("===" + apiName + " start ===\n").c_str());
+
     const auto status = api(args...);
     if (status != NV_ENC_SUCCESS)
     {
         OutputNvencApiError(apiName, status);
-        return false;
     }
-    return true;
+
+    OutputDebugStringA(("===" + apiName + " end ===\n").c_str());
+
+    return status;
 }
 
 
@@ -76,6 +80,7 @@ namespace uNvEncoder
 
 Nvenc::Nvenc(const NvencDesc &desc)
     : desc_(desc)
+    , resources_(4)
 {
     UNVENC_FUNC_SCOPED_TIMER
 
@@ -214,10 +219,15 @@ void Nvenc::CreateCompletionEvent()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    completionEvent_ = ::CreateEventA(NULL, FALSE, FALSE, NULL);
-    NV_ENC_EVENT_PARAMS eventParams = { NV_ENC_EVENT_PARAMS_VER };
-    eventParams.completionEvent = completionEvent_;
-    CALL_NVENC_API(nvenc_.nvEncRegisterAsyncEvent, encoder_, &eventParams);
+    if (!IsValid()) return;
+
+    for (auto &resource : resources_)
+    {
+        resource.completionEvent_ = ::CreateEventA(NULL, FALSE, FALSE, NULL);
+        NV_ENC_EVENT_PARAMS eventParams = { NV_ENC_EVENT_PARAMS_VER };
+        eventParams.completionEvent = resource.completionEvent_;
+        CALL_NVENC_API(nvenc_.nvEncRegisterAsyncEvent, encoder_, &eventParams);
+    }
 }
 
 
@@ -225,10 +235,17 @@ void Nvenc::DestroyCompletionEvent()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    NV_ENC_EVENT_PARAMS eventParams = { NV_ENC_EVENT_PARAMS_VER };
-    eventParams.completionEvent = completionEvent_;
-    CALL_NVENC_API(nvenc_.nvEncUnregisterAsyncEvent, encoder_, &eventParams);
-    ::CloseHandle(completionEvent_);
+    if (!IsValid()) return;
+
+    for (auto &resource : resources_)
+    {
+        if (!resource.completionEvent_) continue;
+
+        NV_ENC_EVENT_PARAMS eventParams = { NV_ENC_EVENT_PARAMS_VER };
+        eventParams.completionEvent = resource.completionEvent_;
+        CALL_NVENC_API(nvenc_.nvEncUnregisterAsyncEvent, encoder_, &eventParams);
+        ::CloseHandle(resource.completionEvent_);
+    }
 }
 
 
@@ -236,15 +253,22 @@ void Nvenc::CreateBitstreamBuffer()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    NV_ENC_CREATE_BITSTREAM_BUFFER createBitstreamBuffer = { NV_ENC_CREATE_BITSTREAM_BUFFER_VER };
-    CALL_NVENC_API(nvenc_.nvEncCreateBitstreamBuffer, encoder_, &createBitstreamBuffer);
-    bitstreamBuffer_ = createBitstreamBuffer.bitstreamBuffer;
+    if (!IsValid()) return;
+
+    for (auto &resource : resources_)
+    {
+        NV_ENC_CREATE_BITSTREAM_BUFFER createBitstreamBuffer = { NV_ENC_CREATE_BITSTREAM_BUFFER_VER };
+        CALL_NVENC_API(nvenc_.nvEncCreateBitstreamBuffer, encoder_, &createBitstreamBuffer);
+        resource.bitstreamBuffer_ = createBitstreamBuffer.bitstreamBuffer;
+    }
 }
 
 
 void Nvenc::CreateInputTexture()
 {
     UNVENC_FUNC_SCOPED_TIMER
+
+    if (!IsValid()) return;
 
     D3D11_TEXTURE2D_DESC desc = { 0 };
     desc.Width = desc_.width;
@@ -256,7 +280,24 @@ void Nvenc::CreateInputTexture()
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_RENDER_TARGET;
     desc.CPUAccessFlags = 0;
-    desc_.d3d11Device->CreateTexture2D(&desc, NULL, &inputTexture_);
+    desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+
+    for (auto &resource : resources_)
+    {
+        if (FAILED(desc_.d3d11Device->CreateTexture2D(&desc, NULL, &resource.inputTexture_)))
+        {
+            // TODO: output error
+            return;
+        }
+
+        ComPtr<IDXGIResource> dxgiResource;
+        resource.inputTexture_.As(&dxgiResource);
+        if (FAILED(dxgiResource->GetSharedHandle(&resource.inputTextureSharedHandle_)))
+        {
+            // TODO: output error
+            return;
+        }
+    }
 }
 
 
@@ -264,38 +305,22 @@ void Nvenc::RegisterResource()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    NV_ENC_REGISTER_RESOURCE registerResource = { NV_ENC_REGISTER_RESOURCE_VER };
-    registerResource.resourceType = NV_ENC_INPUT_RESOURCE_TYPE_DIRECTX;
-    registerResource.resourceToRegister = inputTexture_.Get();
-    registerResource.width = desc_.width;
-    registerResource.height = desc_.height;
-    registerResource.pitch = 0;
-    registerResource.bufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
-    registerResource.bufferUsage = NV_ENC_INPUT_IMAGE;
-    CALL_NVENC_API(nvenc_.nvEncRegisterResource, encoder_, &registerResource);
+    if (!IsValid()) return;
 
-    registeredResource_ = registerResource.registeredResource;
-}
+    for (auto &resource : resources_)
+    {
+        NV_ENC_REGISTER_RESOURCE registerResource = { NV_ENC_REGISTER_RESOURCE_VER };
+        registerResource.resourceType = NV_ENC_INPUT_RESOURCE_TYPE_DIRECTX;
+        registerResource.resourceToRegister = resource.inputTexture_.Get();
+        registerResource.width = desc_.width;
+        registerResource.height = desc_.height;
+        registerResource.pitch = 0;
+        registerResource.bufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
+        registerResource.bufferUsage = NV_ENC_INPUT_IMAGE;
+        CALL_NVENC_API(nvenc_.nvEncRegisterResource, encoder_, &registerResource);
 
-
-void Nvenc::MapInputResource()
-{
-    UNVENC_FUNC_SCOPED_TIMER
-
-    NV_ENC_MAP_INPUT_RESOURCE mapInputResource = { NV_ENC_MAP_INPUT_RESOURCE_VER };
-    mapInputResource.registeredResource = registeredResource_;
-    CALL_NVENC_API(nvenc_.nvEncMapInputResource, encoder_, &mapInputResource);
-    inputResource_ = mapInputResource.mappedResource;
-}
-
-
-void Nvenc::UnmapInputResource()
-{
-    UNVENC_FUNC_SCOPED_TIMER
-
-    if (!inputResource_) return;
-
-    CALL_NVENC_API(nvenc_.nvEncUnmapInputResource, encoder_, inputResource_);
+        resource.registeredResource_ = registerResource.registeredResource;
+    }
 }
 
 
@@ -303,9 +328,13 @@ void Nvenc::UnregisterResource()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    if (!registeredResource_) return;
+    if (!IsValid()) return;
 
-    CALL_NVENC_API(nvenc_.nvEncUnregisterResource, encoder_, registeredResource_);
+    for (auto &resource : resources_)
+    {
+       if (!resource.registeredResource_) continue;
+        CALL_NVENC_API(nvenc_.nvEncUnregisterResource, encoder_, resource.registeredResource_);
+    }
 }
 
 
@@ -313,9 +342,13 @@ void Nvenc::DestroyBitstreamBuffer()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    if (!bitstreamBuffer_) return;
+    if (!IsValid()) return;
 
-    CALL_NVENC_API(nvenc_.nvEncDestroyBitstreamBuffer, encoder_, bitstreamBuffer_);
+    for (auto &resource : resources_)
+    {
+        if (!resource.bitstreamBuffer_) continue;
+        CALL_NVENC_API(nvenc_.nvEncDestroyBitstreamBuffer, encoder_, resource.bitstreamBuffer_);
+    }
 }
 
 
@@ -329,37 +362,114 @@ void Nvenc::DestroyEncoder()
 }
 
 
+void Nvenc::MapInputResource()
+{
+    UNVENC_FUNC_SCOPED_TIMER
+
+    if (!IsValid()) return;
+
+    for (auto &resource : resources_)
+    {
+        if (!resource.registeredResource_) return;
+
+        NV_ENC_MAP_INPUT_RESOURCE mapInputResource = { NV_ENC_MAP_INPUT_RESOURCE_VER };
+        mapInputResource.registeredResource = resource.registeredResource_;
+        CALL_NVENC_API(nvenc_.nvEncMapInputResource, encoder_, &mapInputResource);
+        resource.inputResource_ = mapInputResource.mappedResource;
+    }
+}
+
+
+void Nvenc::UnmapInputResource()
+{
+    UNVENC_FUNC_SCOPED_TIMER
+
+    if (!IsValid()) return;
+
+    for (auto &resource : resources_)
+    {
+        CALL_NVENC_API(nvenc_.nvEncUnmapInputResource, encoder_, resource.inputResource_);
+        resource.inputResource_ = nullptr;
+    }
+}
+
+
 bool Nvenc::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    if (!IsValid() || isEncoding_) return false;
-    isEncoding_ = true;
+    if (!IsValid()) return false;
 
-    CopyToInputTexture(source);
+    const auto index = GetInputIndex();
+    auto &resource = resources_[index];
 
-    if (!EncodeInputTexture(forceIdrFrame)) 
+    if (!IsValid() || resource.isEncoding_) return false;
+    resource.isEncoding_ = true;
+
+    CopyToInputTexture(index, source);
+
+    if (EncodeInputTexture(index, forceIdrFrame)) 
     {
-        isEncoding_ = false;
+        ++inputIndex_;
+        return true;
+    }
+    else
+    {
+        resource.isEncoding_ = false;
         return false;
     }
-
-    return true;
 }
 
 
-bool Nvenc::EncodeInputTexture(bool forceIdrFrame)
+void Nvenc::CopyToInputTexture(int index, const ComPtr<ID3D11Texture2D> &texture)
 {
     UNVENC_FUNC_SCOPED_TIMER
 
+    if (!IsValid()) return;
+
+    auto &resource = resources_[index];
+    ComPtr<ID3D11Texture2D> inputTexture;
+
+    try
+    {
+        if (FAILED(GetUnityDevice()->OpenSharedResource(
+            resource.inputTextureSharedHandle_,
+            __uuidof(ID3D11Texture2D),
+            &inputTexture)))
+        {
+            // TODO: output error
+            return;
+        }
+    }
+    catch (...)
+    {
+        // ::OutputDebugStringA(e.what());
+        return;
+    }
+
+    ComPtr<ID3D11DeviceContext> context;
+    GetUnityDevice()->GetImmediateContext(&context);
+    context->CopyResource(inputTexture.Get(), texture.Get());
+    context->Flush();
+}
+
+
+bool Nvenc::EncodeInputTexture(int index, bool forceIdrFrame)
+{
+    UNVENC_FUNC_SCOPED_TIMER
+
+    if (!IsValid()) return false;
+
+    auto &resource = resources_[index];
+
     NV_ENC_PIC_PARAMS picParams = { NV_ENC_PIC_PARAMS_VER };
     picParams.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
-    picParams.inputBuffer = inputResource_;
+    picParams.inputBuffer = resource.inputResource_;
     picParams.bufferFmt = NV_ENC_BUFFER_FORMAT_ARGB;
     picParams.inputWidth = desc_.width;
     picParams.inputHeight = desc_.height;
-    picParams.outputBitstream = bitstreamBuffer_;
-    picParams.completionEvent = completionEvent_;
+    picParams.outputBitstream = resource.bitstreamBuffer_;
+    picParams.completionEvent = resource.completionEvent_;
     if (forceIdrFrame)
     {
         picParams.encodePicFlags = NV_ENC_PIC_FLAG_FORCEIDR | NV_ENC_PIC_FLAG_OUTPUT_SPSPPS;
@@ -372,26 +482,55 @@ bool Nvenc::EncodeInputTexture(bool forceIdrFrame)
         return false;
     }
 
-    ++frame_;
     return true;
 }
 
 
-void Nvenc::CopyToInputTexture(const ComPtr<ID3D11Texture2D> &texture)
+bool Nvenc::GetEncodedData(std::vector<NvencEncodedData> &data)
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    ComPtr<ID3D11DeviceContext> context;
-    desc_.d3d11Device->GetImmediateContext(&context);
-    context->CopyResource(inputTexture_.Get(), texture.Get());
+    if (!IsValid()) return false;
+
+    for (;outputIndex_ <= inputIndex_; ++outputIndex_)
+    {
+        const auto index = GetOutputIndex();
+        auto &resource = resources_[index];
+
+        if (!resource.isEncoding_) break;
+
+        constexpr DWORD duration = 1000;
+        if (!WaitForCompletion(index, duration)) break;
+
+        NV_ENC_LOCK_BITSTREAM lockBitstream = { NV_ENC_LOCK_BITSTREAM_VER };
+        lockBitstream.outputBitstream = resource.bitstreamBuffer_;
+        lockBitstream.doNotWait = true;
+        CALL_NVENC_API(nvenc_.nvEncLockBitstream, encoder_, &lockBitstream);
+
+        NvencEncodedData ed;
+        ed.size = lockBitstream.bitstreamSizeInBytes;
+        ed.buffer = std::make_unique<uint8_t[]>(ed.size);
+        memcpy(ed.buffer.get(), lockBitstream.bitstreamBufferPtr, ed.size);
+        data.push_back(std::move(ed));
+
+        CALL_NVENC_API(nvenc_.nvEncUnlockBitstream, encoder_, resource.bitstreamBuffer_);
+
+        resource.isEncoding_ = false;
+    }
+
+    return !data.empty();
 }
 
 
-bool Nvenc::WaitForCompletion(DWORD duration)
+bool Nvenc::WaitForCompletion(int index, DWORD duration)
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    if (::WaitForSingleObject(completionEvent_, duration) == WAIT_FAILED)
+    if (!IsValid()) return false;
+
+    auto &resource = resources_[index];
+
+    if (::WaitForSingleObject(resource.completionEvent_, duration) == WAIT_FAILED)
     {
         g_lastError = "Failed to wait for encode completion.";
         return false;
@@ -401,44 +540,15 @@ bool Nvenc::WaitForCompletion(DWORD duration)
 }
 
 
-bool Nvenc::GetEncodedData(NvencEncodedData &data)
-{
-    UNVENC_FUNC_SCOPED_TIMER
-
-    if (frame_ == 0U || !isEncoding_) return false;
-
-    constexpr DWORD duration = 1000;
-    if (!WaitForCompletion(duration)) return false;
-    
-    NV_ENC_LOCK_BITSTREAM lockBitstream = { NV_ENC_LOCK_BITSTREAM_VER };
-    lockBitstream.outputBitstream = bitstreamBuffer_;
-    lockBitstream.doNotWait = true;
-    CALL_NVENC_API(nvenc_.nvEncLockBitstream, encoder_, &lockBitstream);
-  
-    data.size = lockBitstream.bitstreamSizeInBytes;
-    if (data.size > 0)
-    {
-        data.buffer = std::make_unique<uint8_t[]>(data.size);
-        const auto *ptr = lockBitstream.bitstreamBufferPtr;
-        memcpy(data.buffer.get(), ptr, data.size);
-    }
-
-    CALL_NVENC_API(nvenc_.nvEncUnlockBitstream, encoder_, bitstreamBuffer_);
-
-    isEncoding_ = false;
-
-    return data.size > 0;
-}
-
-
 void Nvenc::EndEncode()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
-    if (!IsValid() || frame_ == 0U) return;
+    if (!IsValid() || inputIndex_ == 0U) return;
 
     SendEOS();
-    NvencEncodedData data;
+
+    std::vector<NvencEncodedData> data;
     GetEncodedData(data);
 }
 
@@ -447,9 +557,13 @@ void Nvenc::SendEOS()
 {
     UNVENC_FUNC_SCOPED_TIMER
 
+    if (!IsValid()) return;
+
+    auto &resource = resources_[GetInputIndex()];
+
     NV_ENC_PIC_PARAMS picParams = { NV_ENC_PIC_PARAMS_VER };
     picParams.encodePicFlags = NV_ENC_PIC_FLAG_EOS;
-    picParams.completionEvent = completionEvent_;
+    picParams.completionEvent = resource.completionEvent_;
     CALL_NVENC_API(nvenc_.nvEncEncodePicture, encoder_, &picParams);
 }
 

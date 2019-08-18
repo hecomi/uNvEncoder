@@ -36,9 +36,9 @@ public:
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
-    bool IsEncoding() const;
 
 private:
+    void CreateDevice();
     void CreateNvenc();
     void StartThread();
     void WaitForEncodeRequest();
@@ -46,6 +46,7 @@ private:
     void UpdateGetEncodedData();
 
     const EncoderDesc desc_;
+    ComPtr<ID3D11Device> device_;
     std::unique_ptr<class Nvenc> nvenc_;
     std::vector<NvencEncodedData> encodedDataList_;
     std::vector<NvencEncodedData> encodedDataListCopied_;

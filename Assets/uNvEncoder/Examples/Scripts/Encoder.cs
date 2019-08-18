@@ -26,8 +26,6 @@ public class Encoder : MonoBehaviour
         {
             yield return new WaitForEndOfFrame();
 
-            if (encoder.isEncoding) continue;
-
             if (!encoder.Encode(texture, forceIdrFrame))
             {
                 Debug.LogError("Encode() failed.");

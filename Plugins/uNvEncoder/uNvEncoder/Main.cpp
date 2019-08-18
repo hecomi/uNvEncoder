@@ -105,16 +105,6 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate()
 }
 
 
-UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderIsEncoding()
-{
-    UNVENC_FUNC_SCOPED_TIMER
-
-    if (!g_encoder) return false;
-
-    return static_cast<int>(g_encoder->IsEncoding());
-}
-
-
 UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(ID3D11Texture2D *texture, bool forceIdrFrame)
 {
     UNVENC_FUNC_SCOPED_TIMER

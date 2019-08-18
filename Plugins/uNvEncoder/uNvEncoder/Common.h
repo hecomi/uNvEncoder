@@ -3,6 +3,7 @@
 #include <chrono>
 #include <functional>
 #include <sstream>
+#include <thread>
 #include <wrl/client.h>
 
 
@@ -19,6 +20,7 @@ struct ID3D11Device * GetUnityDevice();
 
 
 // #define UNVENC_DEBUG_ON
+
 
 class ScopedTimer final
 {
@@ -39,13 +41,15 @@ private:
     [] \
     { \
         std::stringstream ss; \
-        ss << __FUNCTION__ << "@" << __FILE__ << ":" << __LINE__ << " => {" << std::endl; \
+        const auto threadId = std::this_thread::get_id(); \
+        ss << threadId << ": " << __FUNCTION__ << "@" << __FILE__ << ":" << __LINE__ << " => {" << std::endl; \
         ::OutputDebugStringA(ss.str().c_str()); \
     }, \
     [](const std::chrono::microseconds &us) \
     { \
         std::stringstream ss; \
-        ss << "} " << __FUNCTION__ << "@" << __FILE__ << ":" << __LINE__ << " => " << us.count() << " [us]" << std::endl; \
+        const auto threadId = std::this_thread::get_id(); \
+        ss << threadId << ": " << "} " << __FUNCTION__ << "@" << __FILE__ << ":" << __LINE__ << " => " << us.count() << " [us]" << std::endl; \
         ::OutputDebugStringA(ss.str().c_str()); \
     });
 #else

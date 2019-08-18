@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <array>
 #include <atomic>
 #include <memory>
 #include <d3d11.h>
@@ -36,9 +37,7 @@ public:
     ~Nvenc();
     bool IsValid() const { return encoder_ != nullptr; }
     bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
-    bool WaitForCompletion(DWORD duration);
-    bool IsEncoding() const { return isEncoding_; }
-    bool GetEncodedData(NvencEncodedData &data);
+    bool GetEncodedData(std::vector<NvencEncodedData> &data);
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
@@ -60,23 +59,33 @@ private:
     void MapInputResource();
     void UnmapInputResource();
 
-    void CopyToInputTexture(const ComPtr<ID3D11Texture2D> &texture);
-    bool EncodeInputTexture(bool forceIdrFrame);
+    void CopyToInputTexture(int index, const ComPtr<ID3D11Texture2D> &texture);
+    bool EncodeInputTexture(int index, bool forceIdrFrame);
+    bool WaitForCompletion(int index, DWORD duration);
     void EndEncode();
     void SendEOS();
+
+    unsigned long GetInputIndex() const { return inputIndex_ % 4; }
+    unsigned long GetOutputIndex() const { return outputIndex_ % 4; }
 
     const NvencDesc desc_;
     HMODULE module_ = nullptr;
     NV_ENCODE_API_FUNCTION_LIST nvenc_ = { 0 };
     void *encoder_ = nullptr;
-    ComPtr<ID3D11Texture2D> inputTexture_ = nullptr;
-    NV_ENC_INPUT_PTR inputResource_ = nullptr;
-    NV_ENC_OUTPUT_PTR bitstreamBuffer_ = nullptr;
-    NV_ENC_REGISTERED_PTR registeredResource_ = nullptr;
-    void *completionEvent_ = nullptr;
+    unsigned long inputIndex_ = 0U;
+    unsigned long outputIndex_ = 0U;
 
-    std::atomic<bool> isEncoding_ = false;
-    unsigned long frame_ = 0U;
+    struct Resource
+    {
+        ComPtr<ID3D11Texture2D> inputTexture_ = nullptr;
+        HANDLE inputTextureSharedHandle_ = nullptr;
+        NV_ENC_INPUT_PTR inputResource_ = nullptr;
+        NV_ENC_OUTPUT_PTR bitstreamBuffer_ = nullptr;
+        NV_ENC_REGISTERED_PTR registeredResource_ = nullptr;
+        void *completionEvent_ = nullptr;
+        std::atomic<bool> isEncoding_ = false;
+    };
+    std::vector<Resource> resources_;
 };
 
 
