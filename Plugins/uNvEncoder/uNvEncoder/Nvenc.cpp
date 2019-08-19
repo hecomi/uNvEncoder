@@ -3,10 +3,7 @@
 #include "Nvenc.h"
 
 
-extern std::string g_lastError;
-
-
-namespace
+namespace uNvEncoder
 {
 
 
@@ -45,16 +42,14 @@ void OutputNvencApiError(const std::string &apiName, NVENCSTATUS status)
 
     const auto it = nvEncStatusErrorNameTable.find(status);
     const auto statusStr = it != nvEncStatusErrorNameTable.end() ? it->second : "Unknown";
-    const auto msg = apiName + " call failed: " + statusStr + "\n";
-    ::OutputDebugStringA(msg.c_str());
-    g_lastError = msg;
+    DebugError(apiName + " call failed: " + statusStr);
 }
 
 
 template <class Api, class ...Args>
 NVENCSTATUS CallNvencApi(const std::string &apiName, const Api &api, const Args &... args)
 {
-    OutputDebugStringA(("===" + apiName + " start ===\n").c_str());
+    UNVENC_FUNC_SCOPED_TIMER
 
     const auto status = api(args...);
     if (status != NV_ENC_SUCCESS)
@@ -62,20 +57,11 @@ NVENCSTATUS CallNvencApi(const std::string &apiName, const Api &api, const Args 
         OutputNvencApiError(apiName, status);
     }
 
-    OutputDebugStringA(("===" + apiName + " end ===\n").c_str());
-
     return status;
 }
 
 
 #define CALL_NVENC_API(Api, ...) CallNvencApi(#Api, Api, __VA_ARGS__)
-
-
-}
-
-
-namespace uNvEncoder
-{
 
 
 Nvenc::Nvenc(const NvencDesc &desc)
@@ -286,7 +272,7 @@ void Nvenc::CreateInputTexture()
     {
         if (FAILED(desc_.d3d11Device->CreateTexture2D(&desc, NULL, &resource.inputTexture_)))
         {
-            // TODO: output error
+            DebugError("Failed to create shared texture.");
             return;
         }
 
@@ -294,7 +280,7 @@ void Nvenc::CreateInputTexture()
         resource.inputTexture_.As(&dxgiResource);
         if (FAILED(dxgiResource->GetSharedHandle(&resource.inputTextureSharedHandle_)))
         {
-            // TODO: output error
+            DebugError("Failed to get shared handle.");
             return;
         }
     }
@@ -430,20 +416,12 @@ void Nvenc::CopyToInputTexture(int index, const ComPtr<ID3D11Texture2D> &texture
     auto &resource = resources_[index];
     ComPtr<ID3D11Texture2D> inputTexture;
 
-    try
+    if (FAILED(GetUnityDevice()->OpenSharedResource(
+        resource.inputTextureSharedHandle_,
+        __uuidof(ID3D11Texture2D),
+        &inputTexture)))
     {
-        if (FAILED(GetUnityDevice()->OpenSharedResource(
-            resource.inputTextureSharedHandle_,
-            __uuidof(ID3D11Texture2D),
-            &inputTexture)))
-        {
-            // TODO: output error
-            return;
-        }
-    }
-    catch (...)
-    {
-        // ::OutputDebugStringA(e.what());
+        DebugError("Failed to open shared texture from shared handle.");
         return;
     }
 
@@ -532,7 +510,7 @@ bool Nvenc::WaitForCompletion(int index, DWORD duration)
 
     if (::WaitForSingleObject(resource.completionEvent_, duration) == WAIT_FAILED)
     {
-        g_lastError = "Failed to wait for encode completion.";
+        DebugError("Failed to wait for encode completion.");
         return false;
     }
 

@@ -30,6 +30,7 @@ class Encoder final
 public:
     explicit Encoder(const EncoderDesc &desc);
     ~Encoder();
+    bool IsValid() const;
     bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
     void CopyEncodedDataList();
     const std::vector<NvencEncodedData> & GetEncodedDataList() const;

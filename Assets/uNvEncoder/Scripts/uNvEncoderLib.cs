@@ -13,11 +13,11 @@ public static class Lib
     // ---
 
     [DllImport(dllName, EntryPoint = "uNvEncoderInitialize")]
-    public static extern bool Initialize(int width, int height, int frameRate);
+    public static extern void Initialize(int width, int height, int frameRate);
     [DllImport(dllName, EntryPoint = "uNvEncoderFinalize")]
-    public static extern bool Finalize();
-    [DllImport(dllName, EntryPoint = "uNvEncoderIsInitialized")]
-    public static extern bool IsInitialized();
+    public static extern void Finalize();
+    [DllImport(dllName, EntryPoint = "uNvEncoderIsValid")]
+    public static extern bool IsValid();
     [DllImport(dllName, EntryPoint = "uNvEncoderGetWidth")]
     public static extern int GetWidth();
     [DllImport(dllName, EntryPoint = "uNvEncoderGetHeight")]

@@ -2,9 +2,6 @@
 #include "Nvenc.h"
 
 
-extern std::string g_lastError;
-
-
 namespace uNvEncoder
 {
 
@@ -34,19 +31,25 @@ Encoder::~Encoder()
 }
 
 
+bool Encoder::IsValid() const
+{
+    return device_ && nvenc_ && nvenc_->IsValid();
+}
+
+
 void Encoder::CreateDevice()
 {
     ComPtr<IDXGIDevice1> dxgiDevice;
     if (FAILED(GetUnityDevice()->QueryInterface(IID_PPV_ARGS(&dxgiDevice)))) 
     {
-        // TODO: output error
+        DebugError("Failed to get IDXGIDevice1.");
         return;
     }
 
     ComPtr<IDXGIAdapter> dxgiAdapter;
     if (FAILED(dxgiDevice->GetAdapter(&dxgiAdapter))) 
     {
-        // TODO: output error
+        DebugError("Failed to get IDXGIAdapter.");
         return;
     }
 

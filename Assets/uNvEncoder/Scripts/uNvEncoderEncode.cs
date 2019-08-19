@@ -48,7 +48,8 @@ public class uNvEncoderEncode : MonoBehaviour
 
     public void InitializeEncoder()
     {
-        if (!Lib.Initialize(width, height, frameRate))
+        Lib.Initialize(width, height, frameRate);
+        if (!Lib.IsValid())
         {
             Debug.LogError(Lib.GetLastError());
         }
@@ -56,10 +57,7 @@ public class uNvEncoderEncode : MonoBehaviour
 
     public void FinalizeEncoder()
     {
-        if (!Lib.Finalize())
-        {
-            Debug.LogError(Lib.GetLastError());
-        }
+        Lib.Finalize();
     }
 
     public void ReinitializeEncoder()
@@ -96,7 +94,7 @@ public class uNvEncoderEncode : MonoBehaviour
             return false;
         }
 
-        if (!Lib.IsInitialized())
+        if (!Lib.IsValid())
         {
             Debug.LogError("uNvEncoder has not been initialized yet.");
             return false;
@@ -108,7 +106,13 @@ public class uNvEncoderEncode : MonoBehaviour
             return false;
         }
 
-        return Lib.Encode(ptr, forceIdrFrame);
+        var result = Lib.Encode(ptr, forceIdrFrame);
+        if (!result)
+        {
+            Debug.LogError(Lib.GetLastError());
+        }
+
+        return result;
     }
 }
 

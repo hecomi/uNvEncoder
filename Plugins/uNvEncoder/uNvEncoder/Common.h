@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <string>
 #include <sstream>
 #include <thread>
 #include <wrl/client.h>
@@ -17,6 +18,7 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 struct IUnityInterfaces * GetUnity();
 struct ID3D11Device * GetUnityDevice();
+void DebugError(const std::string &error);
 
 
 // #define UNVENC_DEBUG_ON
