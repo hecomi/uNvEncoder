@@ -13,18 +13,34 @@ public class Encoder : MonoBehaviour
     [SerializeField]
     RenderTexture texture = null;
 
+    [SerializeField]
+    int frameRate = 60;
+
     public bool forceIdrFrame = true;
 
-    IEnumerator Start()
+    void OnEnable()
     {
         Assert.IsNotNull(encoder);
         Assert.IsNotNull(texture);
-        Assert.AreEqual<int>(encoder.width, texture.width);
-        Assert.AreEqual<int>(encoder.height, texture.height);
+        encoder.StartEncode(texture.width, texture.height, frameRate);
+        StartCoroutine(EncodeLoop());
+    }
 
+    void OnDisable()
+    {
+        StopAllCoroutines();
+        encoder.StopEncode();
+    }
+
+    IEnumerator EncodeLoop()
+    {
         for (;;)
         {
             yield return new WaitForEndOfFrame();
+
+            if (!encoder || !encoder.isValid) continue;
+
+            if (!texture) continue;
 
             if (!encoder.Encode(texture, forceIdrFrame))
             {

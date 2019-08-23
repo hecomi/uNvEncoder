@@ -10,31 +10,40 @@ public class uNvEncoderEncode : MonoBehaviour
 {
     static uNvEncoderEncode instance;
 
-    public int width = 256;
-    public int height = 256;
-    public int frameRate = 60;
-
     [System.Serializable]
     public class EncodedCallback : UnityEvent<System.IntPtr, int> {};
     public EncodedCallback onEncoded = new EncodedCallback();
 
     Task<bool> encodeTask_;
 
-    void OnEnable()
+    public bool isValid
     {
-        Assert.IsNull(instance, "Multiple uNvEncoderEncode instance not allowed.");
-        instance = this;
-        InitializeEncoder();
+        get { return Lib.IsValid(); }
+    }
+
+    public int width
+    {
+        get { return Lib.GetWidth(); }
+    }
+
+    public int height
+    {
+        get { return Lib.GetHeight(); }
+    }
+
+    public int frameRate
+    {
+        get { return Lib.GetFrameRate(); }
     }
 
     void OnDisable()
     {
-        FinalizeEncoder();
-        instance = null;
     }
 
     void Update()
     {
+        if (!isValid) return;
+
         Lib.CopyEncodedData();
 
         int n = Lib.GetEncodedDataCount();
@@ -46,32 +55,29 @@ public class uNvEncoderEncode : MonoBehaviour
         }
     }
 
-    public void InitializeEncoder()
+    public void StartEncode(int width, int height, int frameRate)
     {
+        Assert.IsNull(instance, "Multiple uNvEncoderEncode instance not allowed.");
+        if (instance) return;
+
+        instance = this;
+
         Lib.Initialize(width, height, frameRate);
-        if (!Lib.IsValid())
+
+        if (!isValid)
         {
             Debug.LogError(Lib.GetLastError());
         }
     }
 
-    public void FinalizeEncoder()
+    public void StopEncode()
     {
         Lib.Finalize();
-    }
 
-    public void ReinitializeEncoder()
-    {
-        FinalizeEncoder();
-        InitializeEncoder();
-    }
-
-    bool CheckEncoderSetting()
-    {
-        return
-            width == Lib.GetWidth() &&
-            height == Lib.GetHeight() &&
-            frameRate == Lib.GetFrameRate();
+        if (instance == this) 
+        {
+            instance = null;
+        }
     }
 
     public bool Encode(Texture texture, bool forceIdrFrame)
@@ -94,15 +100,9 @@ public class uNvEncoderEncode : MonoBehaviour
             return false;
         }
 
-        if (!Lib.IsValid())
+        if (!isValid)
         {
             Debug.LogError("uNvEncoder has not been initialized yet.");
-            return false;
-        }
-
-        if (!CheckEncoderSetting())
-        {
-            Debug.LogError("Encode setting has changed. Please call ReinitializeEncoder().");
             return false;
         }
 
