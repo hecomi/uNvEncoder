@@ -18,6 +18,8 @@ Encoder::Encoder(const EncoderDesc &desc)
 Encoder::~Encoder()
 {
     StopThread();
+    DestroyNvenc();
+    DestroyDevice();
 }
 
 
@@ -71,6 +73,12 @@ void Encoder::CreateDevice()
 }
 
 
+void Encoder::DestroyDevice()
+{
+    device_ = nullptr;
+}
+
+
 void Encoder::CreateNvenc()
 {
     NvencDesc desc = { 0 };
@@ -80,6 +88,12 @@ void Encoder::CreateNvenc()
     desc.frameRate = desc_.frameRate;
 
     nvenc_ = std::make_unique<Nvenc>(desc);
+}
+
+
+void Encoder::DestroyNvenc()
+{
+    nvenc_.reset();
 }
 
 

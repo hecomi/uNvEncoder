@@ -64,7 +64,7 @@ NVENCSTATUS CallNvencApi(const std::string &apiName, const Api &api, const Args 
 
 Nvenc::Nvenc(const NvencDesc &desc)
     : desc_(desc)
-    , resources_(4)
+    , resources_(1)
 {
     if (!LoadModule())
     {
@@ -73,18 +73,19 @@ Nvenc::Nvenc(const NvencDesc &desc)
 
     OpenEncodeSession();
     InitializeEncoder();
+
     CreateCompletionEvents();
-    CreateBitstreamBuffers();
     CreateInputTextures();
     RegisterResources();
+    CreateBitstreamBuffers();
 }
 
 
 Nvenc::~Nvenc()
 {
     EndEncode();
-    UnregisterResources();
     DestroyBitstreamBuffers();
+    UnregisterResources();
     DestroyCompletionEvents();
     DestroyEncoder();
 

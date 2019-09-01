@@ -40,7 +40,9 @@ public:
 
 private:
     void CreateDevice();
+    void DestroyDevice();
     void CreateNvenc();
+    void DestroyNvenc();
     void StartThread();
     void StopThread();
     void WaitForEncodeRequest();
