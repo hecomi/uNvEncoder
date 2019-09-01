@@ -21,7 +21,7 @@ struct ID3D11Device * GetUnityDevice();
 void DebugError(const std::string &error);
 
 
-// #define UNVENC_DEBUG_ON
+#define UNVENC_DEBUG_ON
 
 
 class ScopedTimer final

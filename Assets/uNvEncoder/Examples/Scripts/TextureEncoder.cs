@@ -5,17 +5,11 @@ using System.Collections;
 namespace uNvEncoder.Examples
 {
 
-public class Encoder : MonoBehaviour
+public class TextureEncoder : MonoBehaviour
 {
-    [SerializeField]
-    uNvEncoderEncode encoder = null;
-
-    [SerializeField]
-    RenderTexture texture = null;
-
-    [SerializeField]
-    int frameRate = 60;
-
+    public uNvEncoder encoder = null;
+    public Texture texture = null;
+    public int frameRate = 60;
     public bool forceIdrFrame = true;
 
     void OnEnable()
@@ -37,15 +31,19 @@ public class Encoder : MonoBehaviour
         for (;;)
         {
             yield return new WaitForEndOfFrame();
+            Encode();
+        }
+    }
 
-            if (!encoder || !encoder.isValid) continue;
+    void Encode()
+    {
+        if (!encoder || !encoder.isValid) return;
 
-            if (!texture) continue;
+        if (!texture) return;
 
-            if (!encoder.Encode(texture, forceIdrFrame))
-            {
-                Debug.LogError("Encode() failed.");
-            }
+        if (!encoder.Encode(texture, forceIdrFrame))
+        {
+            Debug.LogError("Encode() failed.");
         }
     }
 }

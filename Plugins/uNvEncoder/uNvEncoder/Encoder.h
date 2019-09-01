@@ -42,6 +42,7 @@ private:
     void CreateDevice();
     void CreateNvenc();
     void StartThread();
+    void StopThread();
     void WaitForEncodeRequest();
     void RequestGetEncodedData();
     void UpdateGetEncodedData();
@@ -56,7 +57,7 @@ private:
     std::mutex encodeMutex_;
     std::mutex encodeDataListMutex_;
     bool shouldStopEncodeThread_ = false;
-    bool isEncoding_ = false;
+    bool isEncodeRequested = false;
 };
 
 

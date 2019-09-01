@@ -26,24 +26,18 @@ extern "C"
 
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     g_unity = unityInterfaces;
 }
 
 
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API UnityPluginUnload()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-    
     g_unity = nullptr;
 }
 
 
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderInitialize(int width, int height, int frameRate)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (g_encoder || !g_unity) return;
 
     EncoderDesc desc;
@@ -57,8 +51,6 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderInitialize(int width, 
 
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderFinalize()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!g_encoder) return;
 
     g_encoder.reset();
@@ -67,16 +59,12 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderFinalize()
 
 UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderIsValid()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     return g_encoder && g_encoder->IsValid();
 }
 
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetWidth()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return 0;
 
     return static_cast<int>(g_encoder->GetWidth());
@@ -85,8 +73,6 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetWidth()
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return 0;
 
     return static_cast<int>(g_encoder->GetHeight());
@@ -95,8 +81,6 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight()
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return 0;
 
     return static_cast<int>(g_encoder->GetFrameRate());
@@ -105,8 +89,6 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate()
 
 UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(ID3D11Texture2D *texture, bool forceIdrFrame)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return false;
 
     return g_encoder->Encode(texture, forceIdrFrame);
@@ -115,8 +97,6 @@ UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(ID3D11Texture2D
 
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderCopyEncodedData()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return;
 
     return g_encoder->CopyEncodedDataList();
@@ -125,8 +105,6 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderCopyEncodedData()
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataCount()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return 0;
 
     return static_cast<int>(g_encoder->GetEncodedDataList().size());
@@ -135,8 +113,6 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataCount()
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataSize(int i)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return 0;
 
     const auto &list = g_encoder->GetEncodedDataList();
@@ -148,8 +124,6 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataSize(int 
 
 UNITY_INTERFACE_EXPORT const void * UNITY_INTERFACE_API uNvEncoderGetEncodedDataBuffer(int i)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (!uNvEncoderIsValid()) return nullptr;
 
     const auto &list = g_encoder->GetEncodedDataList();
@@ -159,10 +133,19 @@ UNITY_INTERFACE_EXPORT const void * UNITY_INTERFACE_API uNvEncoderGetEncodedData
 }
 
 
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataIndex(int i)
+{
+    if (!uNvEncoderIsValid()) return -1;
+
+    const auto &list = g_encoder->GetEncodedDataList();
+    if (i < 0 || i >= static_cast<int>(list.size())) return -1;
+
+    return static_cast<int>(list.at(i).index);
+}
+
+
 UNITY_INTERFACE_EXPORT const char * UNITY_INTERFACE_API uNvEncoderGetLastError()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     return g_error.c_str();
 }
 

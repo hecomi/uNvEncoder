@@ -9,8 +9,6 @@ namespace uNvEncoder
 Encoder::Encoder(const EncoderDesc &desc)
     : desc_(desc)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     CreateDevice();
     CreateNvenc();
     StartThread();
@@ -19,15 +17,7 @@ Encoder::Encoder(const EncoderDesc &desc)
 
 Encoder::~Encoder()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
-    shouldStopEncodeThread_ = true;
-    encodeCond_.notify_one();
-
-    if (encodeThread_.joinable())
-    {
-        encodeThread_.join();
-    }
+    StopThread();
 }
 
 
@@ -83,8 +73,6 @@ void Encoder::CreateDevice()
 
 void Encoder::CreateNvenc()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     NvencDesc desc = { 0 };
     desc.d3d11Device = device_;
     desc.width = desc_.width;
@@ -97,8 +85,6 @@ void Encoder::CreateNvenc()
 
 void Encoder::StartThread()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     encodeThread_ = std::thread([&]
     {
         while (!shouldStopEncodeThread_)
@@ -110,10 +96,20 @@ void Encoder::StartThread()
 }
 
 
+void Encoder::StopThread()
+{
+    shouldStopEncodeThread_ = true;
+    encodeCond_.notify_one();
+
+    if (encodeThread_.joinable())
+    {
+        encodeThread_.join();
+    }
+}
+
+
 bool Encoder::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     if (nvenc_->Encode(source, forceIdrFrame))
     {
         RequestGetEncodedData();
@@ -126,30 +122,25 @@ bool Encoder::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
 
 void Encoder::WaitForEncodeRequest()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     std::unique_lock<std::mutex> encodeLock(encodeMutex_);
     encodeCond_.wait(encodeLock, [&] 
     { 
-        return isEncoding_ || shouldStopEncodeThread_; 
+        return isEncodeRequested || shouldStopEncodeThread_; 
     });
+    isEncodeRequested = false;
 }
 
 
 void Encoder::RequestGetEncodedData()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     std::lock_guard<std::mutex> lock(encodeMutex_);
-    isEncoding_ = true;
+    isEncodeRequested = true;
     encodeCond_.notify_one();
 }
 
 
 void Encoder::UpdateGetEncodedData()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     std::vector<NvencEncodedData> data;
     if (nvenc_->GetEncodedData(data))
     {
@@ -159,26 +150,20 @@ void Encoder::UpdateGetEncodedData()
             encodedDataList_.push_back(std::move(ed));
         }
     }
-
-    isEncoding_ = false;
 }
 
 
 void Encoder::CopyEncodedDataList()
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     std::lock_guard<std::mutex> lock(encodeDataListMutex_);
 
-    encodedDataListCopied_ = std::move(encodedDataList_);
-    encodedDataList_.clear();
+    encodedDataListCopied_.clear();
+    std::swap(encodedDataListCopied_, encodedDataList_);
 }
 
 
 const std::vector<NvencEncodedData> & Encoder::GetEncodedDataList() const
 {
-    UNVENC_FUNC_SCOPED_TIMER
-
     return encodedDataListCopied_;
 }
 

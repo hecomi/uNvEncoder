@@ -322,6 +322,9 @@ bool Nvenc::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
     const auto index = GetInputIndex();
     auto &resource = resources_[index];
 
+    ::OutputDebugString(("input" + std::to_string(index)).c_str());
+    ::OutputDebugString("\n");
+
     if (resource.isEncoding_) 
     {
         DebugError("The previous encode is still continuing.");
@@ -434,15 +437,15 @@ bool Nvenc::GetEncodedData(std::vector<NvencEncodedData> &data)
 
         if (!resource.isEncoding_) 
         {
-            DebugError("Try to get an invalid bitstream.");
-            continue;
+            DebugError("Try to get a bitstream buffer that failed to encode.");
+            return false;
         }
 
         constexpr DWORD duration = 10000;
         if (!WaitForCompletion(index, duration))
         {
-            DebugError("Timeout when getting an encoded bitstream.");
-            continue;
+            DebugError("Timeout when getting encoded bitstream.");
+            return false;
         }
 
         NV_ENC_LOCK_BITSTREAM lockBitstream = { NV_ENC_LOCK_BITSTREAM_VER };
@@ -450,11 +453,13 @@ bool Nvenc::GetEncodedData(std::vector<NvencEncodedData> &data)
         lockBitstream.doNotWait = false;
         CALL_NVENC_API(nvenc_.nvEncLockBitstream, encoder_, &lockBitstream);
 
+        ::OutputDebugStringA((std::to_string(lockBitstream.frameIdx) + "\n").c_str());
+
         NvencEncodedData ed;
         ed.index = outputIndex_;
         ed.size = lockBitstream.bitstreamSizeInBytes;
         ed.buffer = std::make_unique<uint8_t[]>(ed.size);
-        ::memcpy(ed.buffer.get(), lockBitstream.bitstreamBufferPtr, ed.size);
+        memcpy(ed.buffer.get(), lockBitstream.bitstreamBufferPtr, ed.size);
         data.push_back(std::move(ed));
 
         CALL_NVENC_API(nvenc_.nvEncUnlockBitstream, encoder_, resource.bitstreamBuffer_);
