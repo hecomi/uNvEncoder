@@ -34,6 +34,8 @@ public static class Lib
     public static extern int GetEncodedDataSize(int i);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedDataBuffer")]
     public static extern IntPtr GetEncodedDataBuffer(int i);
+    [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedDataIndex")]
+    public static extern int GetEncodedDataIndex(int i);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetLastError")]
     private static extern IntPtr GetLastErrorInternal();
 

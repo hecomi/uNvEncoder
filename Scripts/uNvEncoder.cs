@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 namespace uNvEncoder
 {
 
-public class uNvEncoderEncode : MonoBehaviour
+public class uNvEncoder : MonoBehaviour
 {
-    static uNvEncoderEncode instance;
+    static uNvEncoder instance;
 
     [System.Serializable]
     public class EncodedCallback : UnityEvent<System.IntPtr, int> {};
