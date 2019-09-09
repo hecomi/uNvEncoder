@@ -7,23 +7,22 @@ namespace uNvEncoder.Examples
 
 public class TextureEncoder : MonoBehaviour
 {
-    public uNvEncoder encoder = null;
+    public Encoder encoder = new Encoder();
     public Texture texture = null;
     public int frameRate = 60;
     public bool forceIdrFrame = true;
 
     void OnEnable()
     {
-        Assert.IsNotNull(encoder);
         Assert.IsNotNull(texture);
-        encoder.StartEncode(texture.width, texture.height, frameRate);
+        encoder.Create(texture.width, texture.height, frameRate);
         StartCoroutine(EncodeLoop());
     }
 
     void OnDisable()
     {
         StopAllCoroutines();
-        encoder.StopEncode();
+        encoder.Destroy();
     }
 
     IEnumerator EncodeLoop()
@@ -37,14 +36,10 @@ public class TextureEncoder : MonoBehaviour
 
     void Encode()
     {
-        if (!encoder || !encoder.isValid) return;
-
         if (!texture) return;
 
-        if (!encoder.Encode(texture, forceIdrFrame))
-        {
-            Debug.LogError("Encode() failed.");
-        }
+        encoder.Update();
+        encoder.Encode(texture, forceIdrFrame);
     }
 }
 
