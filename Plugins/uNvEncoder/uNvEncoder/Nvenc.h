@@ -35,16 +35,17 @@ class Nvenc final
 public:
     explicit Nvenc(const NvencDesc &desc);
     ~Nvenc();
+    void Initialize();
+    void Finalize();
     bool IsValid() const { return encoder_ != nullptr; }
-    bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
-    bool GetEncodedData(std::vector<NvencEncodedData> &data);
+    void Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
+    void GetEncodedData(std::vector<NvencEncodedData> &data);
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
 
 private:
-    bool LoadModule();
-    void UnloadModule();
+    void ThrowErrorIfNotInitialized();
 
     void OpenEncodeSession();
     void InitializeEncoder();
@@ -70,8 +71,7 @@ private:
     unsigned long GetOutputIndex() const { return outputIndex_ % GetResourceCount(); }
 
     const NvencDesc desc_;
-    HMODULE module_ = nullptr;
-    NV_ENCODE_API_FUNCTION_LIST nvenc_ = { 0 };
+    bool isInitialized_ = false;
     void *encoder_ = nullptr;
     uint64_t inputIndex_ = 0U;
     uint64_t outputIndex_ = 0U;
@@ -87,6 +87,15 @@ private:
         std::atomic<bool> isEncoding_ = false;
     };
     std::vector<Resource> resources_;
+
+public:
+    static void LoadModule();
+    static void UnloadModule();
+
+private:
+    static HMODULE s_module;
+    static NV_ENCODE_API_FUNCTION_LIST s_nvenc;
+    static uint32_t s_referenceCount;
 };
 
 

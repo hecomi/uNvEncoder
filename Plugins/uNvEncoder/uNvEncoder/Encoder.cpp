@@ -9,17 +9,31 @@ namespace uNvEncoder
 Encoder::Encoder(const EncoderDesc &desc)
     : desc_(desc)
 {
-    CreateDevice();
-    CreateNvenc();
-    StartThread();
+    try
+    {
+        CreateDevice();
+        CreateNvenc();
+        StartThread();
+    }
+    catch (const std::exception& e)
+    {
+        error_ = e.what();
+    }
 }
 
 
 Encoder::~Encoder()
 {
-    StopThread();
-    DestroyNvenc();
-    DestroyDevice();
+    try
+    {
+        StopThread();
+        DestroyNvenc();
+        DestroyDevice();
+    }
+    catch (const std::exception& e)
+    {
+        error_ = e.what();
+    }
 }
 
 
@@ -34,14 +48,14 @@ void Encoder::CreateDevice()
     ComPtr<IDXGIDevice1> dxgiDevice;
     if (FAILED(GetUnityDevice()->QueryInterface(IID_PPV_ARGS(&dxgiDevice)))) 
     {
-        DebugError("Failed to get IDXGIDevice1.");
+        ThrowError("Failed to get IDXGIDevice1.");
         return;
     }
 
     ComPtr<IDXGIAdapter> dxgiAdapter;
     if (FAILED(dxgiDevice->GetAdapter(&dxgiAdapter))) 
     {
-        DebugError("Failed to get IDXGIAdapter.");
+        ThrowError("Failed to get IDXGIAdapter.");
         return;
     }
 
@@ -88,11 +102,13 @@ void Encoder::CreateNvenc()
     desc.frameRate = desc_.frameRate;
 
     nvenc_ = std::make_unique<Nvenc>(desc);
+    nvenc_->Initialize();
 }
 
 
 void Encoder::DestroyNvenc()
 {
+    nvenc_->Finalize();
     nvenc_.reset();
 }
 
@@ -124,13 +140,18 @@ void Encoder::StopThread()
 
 bool Encoder::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
 {
-    if (nvenc_->Encode(source, forceIdrFrame))
+    try
     {
-        RequestGetEncodedData();
-        return true;
+        nvenc_->Encode(source, forceIdrFrame);
+    }
+    catch (const std::exception& e)
+    {
+        error_ = e.what();
+        return false;
     }
 
-    return false;
+    RequestGetEncodedData();
+    return true;
 }
 
 
@@ -156,13 +177,21 @@ void Encoder::RequestGetEncodedData()
 void Encoder::UpdateGetEncodedData()
 {
     std::vector<NvencEncodedData> data;
-    if (nvenc_->GetEncodedData(data))
+
+    try
     {
-        std::lock_guard<std::mutex> dataLock(encodeDataListMutex_);
-        for (auto &ed : data)
-        {
-            encodedDataList_.push_back(std::move(ed));
-        }
+        nvenc_->GetEncodedData(data);
+    }
+    catch (const std::exception& e)
+    {
+        error_ = e.what();
+        return;
+    }
+
+    std::lock_guard<std::mutex> dataLock(encodeDataListMutex_);
+    for (auto &ed : data)
+    {
+        encodedDataList_.push_back(std::move(ed));
     }
 }
 

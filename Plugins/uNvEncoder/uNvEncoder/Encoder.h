@@ -37,6 +37,9 @@ public:
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
+    bool HasError() const { return !error_.empty(); }
+    const std::string & GetError() const { return error_; }
+    void ClearError() { error_.clear(); }
 
 private:
     void CreateDevice();
@@ -60,6 +63,7 @@ private:
     std::mutex encodeDataListMutex_;
     bool shouldStopEncodeThread_ = false;
     bool isEncodeRequested = false;
+    std::string error_;
 };
 
 

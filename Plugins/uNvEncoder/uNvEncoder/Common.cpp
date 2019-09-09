@@ -9,7 +9,6 @@ namespace uNvEncoder
 
 
 extern IUnityInterfaces *g_unity;
-extern std::string g_error;
 
 
 IUnityInterfaces * GetUnity()
@@ -24,10 +23,10 @@ ID3D11Device * GetUnityDevice()
 }
 
 
-void DebugError(const std::string &error)
+void ThrowError(const std::string &error)
 {
     ::OutputDebugStringA((error + "\n").c_str());
-    g_error = error;
+    throw std::exception(error.c_str());
 }
 
 

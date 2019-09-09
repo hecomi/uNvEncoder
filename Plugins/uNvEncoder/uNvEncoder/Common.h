@@ -18,7 +18,7 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 struct IUnityInterfaces * GetUnity();
 struct ID3D11Device * GetUnityDevice();
-void DebugError(const std::string &error);
+void ThrowError(const std::string &error);
 
 
 #define UNVENC_DEBUG_ON

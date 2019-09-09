@@ -1,5 +1,5 @@
 #include <memory>
-#include <string>
+#include <map>
 #include <d3d11.h>
 #include <IUnityInterface.h>
 #include "Encoder.h"
@@ -10,13 +10,19 @@
 
 
 using namespace uNvEncoder;
+using EncoderId = int;
 
 
 namespace uNvEncoder
 {
     IUnityInterfaces *g_unity = nullptr;
-    std::string g_error;
-    std::unique_ptr<Encoder> g_encoder;
+}
+
+
+namespace
+{
+    std::map<EncoderId, std::unique_ptr<Encoder>> g_encoders;
+    EncoderId g_encoderId = 0;
 }
 
 
@@ -36,117 +42,134 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API UnityPluginUnload()
 }
 
 
-UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderInitialize(int width, int height, int frameRate)
+const std::unique_ptr<Encoder> & GetEncoder(EncoderId id)
 {
-    if (g_encoder || !g_unity) return;
+    static std::unique_ptr<Encoder> invalid;
+    const auto it = g_encoders.find(id);
+    return (it != g_encoders.end()) ? it->second : invalid;
+}
+
+
+UNITY_INTERFACE_EXPORT EncoderId UNITY_INTERFACE_API uNvEncoderCreateEncoder(int width, int height, int frameRate)
+{
+    const auto id = g_encoderId++;
 
     EncoderDesc desc;
     desc.width = width;
     desc.height = height;
     desc.frameRate = frameRate;
 
-    g_encoder = std::make_unique<Encoder>(desc);
+    auto encoder = std::make_unique<Encoder>(desc);
+    g_encoders.emplace(id, std::move(encoder));
+
+    return id;
 }
 
 
-UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderFinalize()
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderDestroyEncoder(EncoderId id)
 {
-    if (!g_encoder) return;
-
-    g_encoder.reset();
+    g_encoders.erase(id);
 }
 
 
-UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderIsValid()
+UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderIsValid(EncoderId id)
 {
-    return g_encoder && g_encoder->IsValid();
+    const auto &encoder = GetEncoder(id);
+    return encoder ? encoder->IsValid() : false;
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetWidth()
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetWidth(EncoderId id)
 {
-    if (!uNvEncoderIsValid()) return 0;
-
-    return static_cast<int>(g_encoder->GetWidth());
+    const auto &encoder = GetEncoder(id);
+    return encoder ? static_cast<int>(encoder->GetWidth()) : 0;
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight()
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight(EncoderId id)
 {
-    if (!uNvEncoderIsValid()) return 0;
-
-    return static_cast<int>(g_encoder->GetHeight());
+    const auto &encoder = GetEncoder(id);
+    return encoder ? static_cast<int>(encoder->GetHeight()) : 0;
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate()
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate(EncoderId id)
 {
-    if (!uNvEncoderIsValid()) return 0;
-
-    return static_cast<int>(g_encoder->GetFrameRate());
+    const auto &encoder = GetEncoder(id);
+    return encoder ? static_cast<int>(encoder->GetFrameRate()) : 0;
 }
 
 
-UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(ID3D11Texture2D *texture, bool forceIdrFrame)
+UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(EncoderId id, ID3D11Texture2D *texture, bool forceIdrFrame)
 {
-    if (!uNvEncoderIsValid()) return false;
-
-    return g_encoder->Encode(texture, forceIdrFrame);
+    if (const auto &encoder = GetEncoder(id))
+    {
+        return encoder->Encode(texture, forceIdrFrame);
+    }
+    return false;
 }
 
 
-UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderCopyEncodedData()
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderCopyEncodedData(EncoderId id)
 {
-    if (!uNvEncoderIsValid()) return;
-
-    return g_encoder->CopyEncodedDataList();
+    if (const auto &encoder = GetEncoder(id))
+    {
+        encoder->CopyEncodedDataList();
+    }
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataCount()
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataCount(EncoderId id)
 {
-    if (!uNvEncoderIsValid()) return 0;
-
-    return static_cast<int>(g_encoder->GetEncodedDataList().size());
+    const auto &encoder = GetEncoder(id);
+    return encoder ? static_cast<int>(encoder->GetEncodedDataList().size()) : 0;
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataSize(int i)
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataSize(EncoderId id, int index)
 {
-    if (!uNvEncoderIsValid()) return 0;
+    const auto &encoder = GetEncoder(id);
+    if (!encoder) return 0;
 
-    const auto &list = g_encoder->GetEncodedDataList();
-    if (i < 0 || i >= static_cast<int>(list.size())) return 0;
+    const auto &list = encoder->GetEncodedDataList();
+    if (index < 0 || index >= static_cast<int>(list.size())) return 0;
 
-    return static_cast<int>(list.at(i).size);
+    return static_cast<int>(list.at(index).size);
 }
 
 
-UNITY_INTERFACE_EXPORT const void * UNITY_INTERFACE_API uNvEncoderGetEncodedDataBuffer(int i)
+UNITY_INTERFACE_EXPORT const void * UNITY_INTERFACE_API uNvEncoderGetEncodedDataBuffer(EncoderId id, int index)
 {
-    if (!uNvEncoderIsValid()) return nullptr;
+    const auto &encoder = GetEncoder(id);
+    if (!encoder) return nullptr;
 
-    const auto &list = g_encoder->GetEncodedDataList();
-    if (i < 0 || i >= static_cast<int>(list.size())) return nullptr;
+    const auto &list = encoder->GetEncodedDataList();
+    if (index < 0 || index >= static_cast<int>(list.size())) return nullptr;
 
-    return list.at(i).buffer.get();
+    return list.at(index).buffer.get();
 }
 
 
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetEncodedDataIndex(int i)
+UNITY_INTERFACE_EXPORT const char * UNITY_INTERFACE_API uNvEncoderGetError(EncoderId id)
 {
-    if (!uNvEncoderIsValid()) return -1;
-
-    const auto &list = g_encoder->GetEncodedDataList();
-    if (i < 0 || i >= static_cast<int>(list.size())) return -1;
-
-    return static_cast<int>(list.at(i).index);
+    const auto &encoder = GetEncoder(id);
+    return encoder ? encoder->GetError().c_str() : nullptr;
 }
 
 
-UNITY_INTERFACE_EXPORT const char * UNITY_INTERFACE_API uNvEncoderGetLastError()
+UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderHasError(EncoderId id)
 {
-    return g_error.c_str();
+    const auto &encoder = GetEncoder(id);
+    return encoder ? encoder->HasError() : false;
+}
+
+
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderClearError(EncoderId id)
+{
+    if (const auto &encoder = GetEncoder(id))
+    {
+        encoder->ClearError();
+    }
 }
 
 
