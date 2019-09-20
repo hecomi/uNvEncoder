@@ -50,13 +50,14 @@ const std::unique_ptr<Encoder> & GetEncoder(EncoderId id)
 }
 
 
-UNITY_INTERFACE_EXPORT EncoderId UNITY_INTERFACE_API uNvEncoderCreateEncoder(int width, int height, int frameRate)
+UNITY_INTERFACE_EXPORT EncoderId UNITY_INTERFACE_API uNvEncoderCreateEncoder(int width, int height, DXGI_FORMAT format, int frameRate)
 {
     const auto id = g_encoderId++;
 
     EncoderDesc desc;
     desc.width = width;
     desc.height = height;
+    desc.format = format;
     desc.frameRate = frameRate;
 
     auto encoder = std::make_unique<Encoder>(desc);
@@ -93,6 +94,13 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight(EncoderId id)
 }
 
 
+UNITY_INTERFACE_EXPORT DXGI_FORMAT UNITY_INTERFACE_API uNvEncoderGetFormat(EncoderId id)
+{
+    const auto &encoder = GetEncoder(id);
+    return encoder ? encoder->GetFormat() : DXGI_FORMAT_UNKNOWN;
+}
+
+
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate(EncoderId id)
 {
     const auto &encoder = GetEncoder(id);
@@ -104,7 +112,17 @@ UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncode(EncoderId id, I
 {
     if (const auto &encoder = GetEncoder(id))
     {
-        return encoder->Encode(texture, forceIdrFrame);
+        return encoder->Encode(ComPtr<ID3D11Texture2D>(texture), forceIdrFrame);
+    }
+    return false;
+}
+
+
+UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderEncodeSharedHandle(EncoderId id, HANDLE handle, bool forceIdrFrame)
+{
+    if (const auto &encoder = GetEncoder(id))
+    {
+        return encoder->Encode(handle, forceIdrFrame);
     }
     return false;
 }

@@ -18,6 +18,7 @@ struct NvencDesc
     ComPtr<ID3D11Device> d3d11Device; 
     uint32_t width = 1920; 
     uint32_t height = 1080;
+    DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
     uint32_t frameRate = 60;
 };
 

@@ -99,6 +99,7 @@ void Encoder::CreateNvenc()
     desc.d3d11Device = device_;
     desc.width = desc_.width;
     desc.height = desc_.height;
+    desc.format = desc_.format;
     desc.frameRate = desc_.frameRate;
 
     nvenc_ = std::make_unique<Nvenc>(desc);
@@ -152,6 +153,21 @@ bool Encoder::Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame)
 
     RequestGetEncodedData();
     return true;
+}
+
+
+bool Encoder::Encode(HANDLE sharedHandle, bool forceIdrFrame)
+{
+    ComPtr<ID3D11Texture2D> source;
+    if (FAILED(GetUnityDevice()->OpenSharedResource(
+        sharedHandle,
+        __uuidof(ID3D11Texture2D),
+        &source)))
+    {
+        return false;
+    }
+
+    return Encode(source, forceIdrFrame);
 }
 
 

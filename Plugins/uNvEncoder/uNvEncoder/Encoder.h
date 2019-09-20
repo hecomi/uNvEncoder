@@ -22,6 +22,7 @@ struct EncoderDesc
     int width; 
     int height;
     int frameRate;
+    DXGI_FORMAT format;
 };
 
 
@@ -32,11 +33,13 @@ public:
     ~Encoder();
     bool IsValid() const;
     bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
+    bool Encode(HANDLE sharedHandle, bool forceIdrFrame);
     void CopyEncodedDataList();
     const std::vector<NvencEncodedData> & GetEncodedDataList() const;
     const uint32_t GetWidth() const { return desc_.width; }
     const uint32_t GetHeight() const { return desc_.height; }
     const uint32_t GetFrameRate() const { return desc_.frameRate; }
+    const DXGI_FORMAT GetFormat() const { return desc_.format; }
     bool HasError() const { return !error_.empty(); }
     const std::string & GetError() const { return error_; }
     void ClearError() { error_.clear(); }
