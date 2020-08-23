@@ -6,6 +6,11 @@ using System.Runtime.InteropServices;
 namespace uNvEncoder
 {
 
+public enum DXGI_FORMAT
+{
+    DXGI_FORMAT_R8G8B8A8_UNORM = 28,
+};
+
 public static class Lib
 {
     public const string dllName = "uNvEncoder";
@@ -13,7 +18,7 @@ public static class Lib
     // ---
 
     [DllImport(dllName, EntryPoint = "uNvEncoderCreateEncoder")]
-    public static extern int CreateEncoder(int width, int height, int frameRate);
+    public static extern int CreateEncoder(int width, int height, DXGI_FORMAT format, int frameRate);
     [DllImport(dllName, EntryPoint = "uNvEncoderDestroyEncoder")]
     public static extern int DestroyEncoder(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderIsValid")]

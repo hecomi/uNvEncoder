@@ -7,6 +7,8 @@ namespace uNvEncoder
 [System.Serializable]
 public class Encoder
 {
+    public DXGI_FORMAT format = DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
+
     [System.Serializable]
     public class EncodedCallback : UnityEvent<System.IntPtr, int> {};
     public EncodedCallback onEncoded = new EncodedCallback();
@@ -47,7 +49,7 @@ public class Encoder
 
     public void Create(int width, int height, int frameRate)
     {
-        id = Lib.CreateEncoder(width, height, frameRate);
+        id = Lib.CreateEncoder(width, height, format, frameRate);
 
         if (!isValid)
         {
