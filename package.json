@@ -1,0 +1,28 @@
+{
+    "name": "com.hecomi.unvencoder",
+    "version": "1.0.0",
+    "displayName": "uNvEncoder",
+    "description": "A simple wrapper of NVENC (NVIDIA's HW-accelerated encoder) for Unity.",
+    "author": {
+        "name": "hecomi",
+        "url": "https://tips.hecomi.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/hecomi/uNvEncoder"
+    },
+    "keywords": [
+        "unity",
+        "nvidia",
+        "nvenc",
+        "native-plugin"
+    ],
+    "license": "MIT License",
+    "samples": [
+        {
+            "displayName": "Sample",
+            "description": "A basic example",
+            "path": "Samples~"
+        }
+    ]
+}
