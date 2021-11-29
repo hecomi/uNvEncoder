@@ -32,8 +32,12 @@ public class OutputEncodedDataToFile : MonoBehaviour
         }
     }
 
-    public void OnEncoded(System.IntPtr ptr, int size)
+    public void OnData(System.IntPtr ptr, int size)
     {
+        if (!enabled) return;
+
+        if (ptr == System.IntPtr.Zero) return;
+
         var bytes = new byte[size];
         Marshal.Copy(ptr, bytes, 0, size);
         binaryWriter_.Write(bytes);

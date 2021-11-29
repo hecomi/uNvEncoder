@@ -6,10 +6,30 @@ using System.Runtime.InteropServices;
 namespace uNvEncoder
 {
 
-public enum DXGI_FORMAT
+public enum Format
 {
-    DXGI_FORMAT_R8G8B8A8_UNORM = 28,
-};
+    R8G8B8A8_UNORM = 28,
+    B8G8R8A8_UNORM = 87,
+    NV12 = 103,
+    UNKNOWN = 0,
+}
+
+[StructLayout(LayoutKind.Sequential), Serializable]
+public struct EncoderDesc
+{
+    [MarshalAs(UnmanagedType.I4)]
+    public int width;
+    [MarshalAs(UnmanagedType.I4)]
+    public int height;
+    [MarshalAs(UnmanagedType.I4)]
+    public int frameRate;
+    [MarshalAs(UnmanagedType.I4)]
+    public int bitRate;
+    [MarshalAs(UnmanagedType.I4)]
+    public int maxFrameSize;
+    [MarshalAs(UnmanagedType.I4)]
+    public Format format;
+}
 
 public static class Lib
 {
@@ -17,20 +37,26 @@ public static class Lib
 
     // ---
 
-    [DllImport(dllName, EntryPoint = "uNvEncoderCreateEncoder")]
-    public static extern int CreateEncoder(int width, int height, DXGI_FORMAT format, int frameRate);
-    [DllImport(dllName, EntryPoint = "uNvEncoderDestroyEncoder")]
-    public static extern int DestroyEncoder(int id);
+    [DllImport(dllName, EntryPoint = "uNvEncoderCreate")]
+    private static extern int CreateInternal(IntPtr desc);
+    [DllImport(dllName, EntryPoint = "uNvEncoderDestroy")]
+    public static extern int Destroy(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderIsValid")]
     public static extern bool IsValid(int id);
+    [DllImport(dllName, EntryPoint = "uNvEncoderReconfigure")]
+    private static extern void ReconfigureInternal(int id, IntPtr desc);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetWidth")]
     public static extern int GetWidth(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetHeight")]
     public static extern int GetHeight(int id);
+    [DllImport(dllName, EntryPoint = "uNvEncoderGetFormat")]
+    public static extern Format GetFormat(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetFrameRate")]
     public static extern int GetFrameRate(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderEncode")]
     public static extern bool Encode(int id, IntPtr texturePtr, bool forceIdrFrame);
+    [DllImport(dllName, EntryPoint = "uNvEncoderEncodeSharedHandle")]
+    public static extern bool EncodeSharedHandle(int id, IntPtr sharedHandle, bool forceIdrFrame);
     [DllImport(dllName, EntryPoint = "uNvEncoderCopyEncodedData")]
     public static extern void CopyEncodedData(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderGetEncodedDataCount")]
@@ -45,6 +71,23 @@ public static class Lib
     public static extern bool HasError(int id);
     [DllImport(dllName, EntryPoint = "uNvEncoderClearError")]
     public static extern void ClearError(int id);
+
+    public static int Create(EncoderDesc desc)
+    {
+        var ptr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EncoderDesc)));
+        Marshal.StructureToPtr(desc, ptr, false);
+        var id = CreateInternal(ptr);
+        Marshal.FreeHGlobal(ptr);
+        return id;
+        }
+
+    public static void Reconfigure(int id, EncoderDesc desc)
+    {
+        var ptr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EncoderDesc)));
+        Marshal.StructureToPtr(desc, ptr, false);
+        ReconfigureInternal(id, ptr);
+        Marshal.FreeHGlobal(ptr);
+    }
 
     public static string GetError(int id)
     {

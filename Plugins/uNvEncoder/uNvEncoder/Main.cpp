@@ -50,26 +50,27 @@ const std::unique_ptr<Encoder> & GetEncoder(EncoderId id)
 }
 
 
-UNITY_INTERFACE_EXPORT EncoderId UNITY_INTERFACE_API uNvEncoderCreateEncoder(int width, int height, DXGI_FORMAT format, int frameRate)
+UNITY_INTERFACE_EXPORT EncoderId UNITY_INTERFACE_API uNvEncoderCreate(const EncoderDesc &desc)
 {
     const auto id = g_encoderId++;
-
-    EncoderDesc desc;
-    desc.width = width;
-    desc.height = height;
-    desc.format = format;
-    desc.frameRate = frameRate;
-
     auto encoder = std::make_unique<Encoder>(desc);
     g_encoders.emplace(id, std::move(encoder));
-
     return id;
 }
 
 
-UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderDestroyEncoder(EncoderId id)
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderDestroy(EncoderId id)
 {
     g_encoders.erase(id);
+}
+
+
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API uNvEncoderReconfigure(int id, const EncoderDesc &desc)
+{
+    if (const auto &encoder = GetEncoder(id))
+    {
+        encoder->Reconfigure(desc);
+    }
 }
 
 
@@ -83,28 +84,28 @@ UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API uNvEncoderIsValid(EncoderId id)
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetWidth(EncoderId id)
 {
     const auto &encoder = GetEncoder(id);
-    return encoder ? static_cast<int>(encoder->GetWidth()) : 0;
+    return encoder ? static_cast<int>(encoder->GetDesc().width) : 0;
 }
 
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetHeight(EncoderId id)
 {
     const auto &encoder = GetEncoder(id);
-    return encoder ? static_cast<int>(encoder->GetHeight()) : 0;
+    return encoder ? static_cast<int>(encoder->GetDesc().height) : 0;
 }
 
 
 UNITY_INTERFACE_EXPORT DXGI_FORMAT UNITY_INTERFACE_API uNvEncoderGetFormat(EncoderId id)
 {
     const auto &encoder = GetEncoder(id);
-    return encoder ? encoder->GetFormat() : DXGI_FORMAT_UNKNOWN;
+    return encoder ? encoder->GetDesc().format : DXGI_FORMAT_UNKNOWN;
 }
 
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API uNvEncoderGetFrameRate(EncoderId id)
 {
     const auto &encoder = GetEncoder(id);
-    return encoder ? static_cast<int>(encoder->GetFrameRate()) : 0;
+    return encoder ? static_cast<int>(encoder->GetDesc().frameRate) : 0;
 }
 
 

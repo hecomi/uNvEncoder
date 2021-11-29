@@ -8,6 +8,7 @@
 #include <mutex>
 #include <d3d11.h>
 #include "Common.h"
+#include "Nvenc.h"
 
 
 namespace uNvEncoder
@@ -22,6 +23,8 @@ struct EncoderDesc
     int width; 
     int height;
     int frameRate;
+    int bitRate;
+    int maxFrameSize;
     DXGI_FORMAT format;
 };
 
@@ -32,19 +35,18 @@ public:
     explicit Encoder(const EncoderDesc &desc);
     ~Encoder();
     bool IsValid() const;
+    void Reconfigure(const EncoderDesc &desc);
     bool Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
     bool Encode(HANDLE sharedHandle, bool forceIdrFrame);
     void CopyEncodedDataList();
     const std::vector<NvencEncodedData> & GetEncodedDataList() const;
-    const uint32_t GetWidth() const { return desc_.width; }
-    const uint32_t GetHeight() const { return desc_.height; }
-    const uint32_t GetFrameRate() const { return desc_.frameRate; }
-    const DXGI_FORMAT GetFormat() const { return desc_.format; }
+    const EncoderDesc & GetDesc() const { return desc_; }
     bool HasError() const { return !error_.empty(); }
     const std::string & GetError() const { return error_; }
     void ClearError() { error_.clear(); }
 
 private:
+    NvencDesc CreateNvencDesc() const;
     void CreateDevice();
     void DestroyDevice();
     void CreateNvenc();
@@ -55,7 +57,7 @@ private:
     void RequestGetEncodedData();
     void UpdateGetEncodedData();
 
-    const EncoderDesc desc_;
+    EncoderDesc desc_;
     ComPtr<ID3D11Device> device_;
     std::unique_ptr<class Nvenc> nvenc_;
     std::vector<NvencEncodedData> encodedDataList_;

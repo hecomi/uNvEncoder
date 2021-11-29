@@ -162,6 +162,23 @@ void Nvenc::Finalize()
 }
 
 
+void Nvenc::Reconfigure(const NvencDesc &desc)
+{
+    std::vector<NvencEncodedData> data;
+    GetEncodedData(data);
+
+    desc_ = desc;
+    CreateInitializeParams();
+
+    NV_ENC_RECONFIGURE_PARAMS reconfigureParams = { NV_ENC_RECONFIGURE_PARAMS_VER };
+    reconfigureParams.resetEncoder = 1;
+    reconfigureParams.forceIDR = 1;
+    memcpy(&reconfigureParams.reInitEncodeParams, &initParams_, sizeof(NV_ENC_INITIALIZE_PARAMS));
+
+    CALL_NVENC_API(s_nvenc.nvEncReconfigureEncoder, &encoder_, &reconfigureParams);
+}
+
+
 void Nvenc::ThrowErrorIfNotInitialized()
 {
     if (!IsValid()) ThrowError("NVENC has not been initialized yet.");
@@ -180,40 +197,53 @@ void Nvenc::OpenEncodeSession()
 
 void Nvenc::InitializeEncoder()
 {
-    NV_ENC_INITIALIZE_PARAMS initParams = { NV_ENC_INITIALIZE_PARAMS_VER };
-    initParams.encodeGUID = NV_ENC_CODEC_H264_GUID;
-    initParams.presetGUID = NV_ENC_PRESET_LOW_LATENCY_DEFAULT_GUID;
-    initParams.encodeWidth = desc_.width;
-    initParams.encodeHeight = desc_.height;
-    initParams.darWidth = desc_.width;
-    initParams.darHeight = desc_.height;
-    initParams.frameRateNum = desc_.frameRate;
-    initParams.frameRateDen = 1;
-    initParams.enablePTD = 1;
-    initParams.reportSliceOffsets = 0;
-    initParams.enableSubFrameWrite = 0;
-    initParams.maxEncodeWidth = desc_.width;
-    initParams.maxEncodeHeight = desc_.height;
-    initParams.enableMEOnlyMode = false;
-    initParams.enableOutputInVidmem = false;
-    initParams.enableEncodeAsync = true;
+    CreateInitializeParams();
+    CALL_NVENC_API(s_nvenc.nvEncInitializeEncoder, encoder_, &initParams_);
+}
+
+
+void Nvenc::CreateInitializeParams()
+{
+    initParams_ = { NV_ENC_INITIALIZE_PARAMS_VER };
+    initParams_.encodeGUID = NV_ENC_CODEC_H264_GUID;
+    initParams_.presetGUID = NV_ENC_PRESET_LOW_LATENCY_DEFAULT_GUID;
+    initParams_.encodeWidth = desc_.width;
+    initParams_.encodeHeight = desc_.height;
+    initParams_.darWidth = desc_.width;
+    initParams_.darHeight = desc_.height;
+    initParams_.frameRateNum = desc_.frameRate;
+    initParams_.frameRateDen = 1;
+    initParams_.enablePTD = 1;
+    initParams_.reportSliceOffsets = 0;
+    initParams_.enableSubFrameWrite = 0;
+    initParams_.maxEncodeWidth = desc_.width;
+    initParams_.maxEncodeHeight = desc_.height;
+    initParams_.enableMEOnlyMode = false;
+    initParams_.enableOutputInVidmem = false;
+    initParams_.enableEncodeAsync = true;
 
     NV_ENC_PRESET_CONFIG presetConfig = { NV_ENC_PRESET_CONFIG_VER, { NV_ENC_CONFIG_VER } };
-    CALL_NVENC_API(s_nvenc.nvEncGetEncodePresetConfig, encoder_, initParams.encodeGUID, initParams.presetGUID, &presetConfig);
+    CALL_NVENC_API(s_nvenc.nvEncGetEncodePresetConfig, encoder_, initParams_.encodeGUID, initParams_.presetGUID, &presetConfig);
 
-    NV_ENC_CONFIG config = { NV_ENC_CONFIG_VER };
-    memcpy(&config, &presetConfig.presetCfg, sizeof(NV_ENC_CONFIG));
-    config.profileGUID = NV_ENC_H264_PROFILE_HIGH_GUID;
-    config.frameIntervalP = 1;
-    config.gopLength = NVENC_INFINITE_GOPLENGTH;
-    config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR_HQ;
-    initParams.encodeConfig = &config;
-
-    config.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
-    config.encodeCodecConfig.h264Config.maxNumRefFrames = 0;
-    config.encodeCodecConfig.h264Config.idrPeriod = config.gopLength;
-
-    CALL_NVENC_API(s_nvenc.nvEncInitializeEncoder, encoder_, &initParams);
+    encConfig_ = { NV_ENC_CONFIG_VER };
+    memcpy(&encConfig_, &presetConfig.presetCfg, sizeof(NV_ENC_CONFIG));
+    encConfig_.profileGUID = NV_ENC_H264_PROFILE_HIGH_GUID;
+    encConfig_.frameIntervalP = 1;
+    encConfig_.gopLength = NVENC_INFINITE_GOPLENGTH;
+    encConfig_.rcParams.version = NV_ENC_RC_PARAMS_VER;
+    encConfig_.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR_LOWDELAY_HQ;
+    encConfig_.rcParams.vbvBufferSize = desc_.maxFrameSize;
+    encConfig_.rcParams.vbvInitialDelay = desc_.maxFrameSize;
+    encConfig_.rcParams.maxBitRate = desc_.bitRate;
+    encConfig_.rcParams.averageBitRate = desc_.bitRate;
+    auto &h264Config = encConfig_.encodeCodecConfig.h264Config;
+    h264Config.repeatSPSPPS = 1;
+    h264Config.maxNumRefFrames = 0;
+    h264Config.idrPeriod = encConfig_.gopLength;
+    h264Config.enableIntraRefresh = true;
+    h264Config.intraRefreshPeriod = desc_.frameRate * 10;
+    h264Config.intraRefreshCnt = desc_.frameRate;
+    initParams_.encodeConfig = &encConfig_;
 }
 
 
@@ -394,6 +424,7 @@ void Nvenc::CopyToInputTexture(int index, const ComPtr<ID3D11Texture2D> &texture
     ComPtr<ID3D11DeviceContext> context;
     GetUnityDevice()->GetImmediateContext(&context);
     context->CopyResource(inputTexture.Get(), texture.Get());
+    // context->CopySubresourceRegion(inputTexture.Get(), 0, 0, 0, 0, texture.Get(), 0, NULL);
     context->Flush();
 }
 

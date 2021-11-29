@@ -20,6 +20,8 @@ struct NvencDesc
     uint32_t height = 1080;
     DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
     uint32_t frameRate = 60;
+    uint32_t bitRate = 2'000'000;
+    uint32_t maxFrameSize = 2'000'000 / 60;
 };
 
 
@@ -39,17 +41,16 @@ public:
     void Initialize();
     void Finalize();
     bool IsValid() const { return encoder_ != nullptr; }
+    void Reconfigure(const NvencDesc &desc);
     void Encode(const ComPtr<ID3D11Texture2D> &source, bool forceIdrFrame);
     void GetEncodedData(std::vector<NvencEncodedData> &data);
-    const uint32_t GetWidth() const { return desc_.width; }
-    const uint32_t GetHeight() const { return desc_.height; }
-    const uint32_t GetFrameRate() const { return desc_.frameRate; }
 
 private:
     void ThrowErrorIfNotInitialized();
 
     void OpenEncodeSession();
     void InitializeEncoder();
+    void CreateInitializeParams();
     void DestroyEncoder();
     void CreateCompletionEvents();
     void DestroyCompletionEvents();
@@ -71,7 +72,9 @@ private:
     unsigned long GetInputIndex() const { return inputIndex_ % GetResourceCount(); }
     unsigned long GetOutputIndex() const { return outputIndex_ % GetResourceCount(); }
 
-    const NvencDesc desc_;
+    NvencDesc desc_;
+    NV_ENC_INITIALIZE_PARAMS initParams_ = { NV_ENC_INITIALIZE_PARAMS_VER };
+    NV_ENC_CONFIG encConfig_ = { NV_ENC_CONFIG_VER };;
     bool isInitialized_ = false;
     void *encoder_ = nullptr;
     uint64_t inputIndex_ = 0U;

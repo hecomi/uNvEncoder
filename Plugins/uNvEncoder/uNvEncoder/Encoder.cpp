@@ -1,5 +1,4 @@
 #include "Encoder.h"
-#include "Nvenc.h"
 
 
 namespace uNvEncoder
@@ -40,6 +39,29 @@ Encoder::~Encoder()
 bool Encoder::IsValid() const
 {
     return device_ && nvenc_ && nvenc_->IsValid();
+}
+
+
+NvencDesc Encoder::CreateNvencDesc() const
+{
+    NvencDesc desc = { 0 };
+    desc.d3d11Device = device_;
+    desc.width = desc_.width;
+    desc.height = desc_.height;
+    desc.format = desc_.format;
+    desc.frameRate = desc_.frameRate;
+    desc.bitRate = desc_.bitRate;
+    desc.maxFrameSize = desc_.maxFrameSize;
+    return desc;
+}
+
+
+void Encoder::Reconfigure(const EncoderDesc &encDesc)
+{
+    if (!IsValid()) return;
+
+    desc_ = encDesc;
+    nvenc_->Reconfigure(CreateNvencDesc());
 }
 
 
@@ -95,14 +117,7 @@ void Encoder::DestroyDevice()
 
 void Encoder::CreateNvenc()
 {
-    NvencDesc desc = { 0 };
-    desc.d3d11Device = device_;
-    desc.width = desc_.width;
-    desc.height = desc_.height;
-    desc.format = desc_.format;
-    desc.frameRate = desc_.frameRate;
-
-    nvenc_ = std::make_unique<Nvenc>(desc);
+    nvenc_ = std::make_unique<Nvenc>(CreateNvencDesc());
     nvenc_->Initialize();
 }
 
