@@ -7,11 +7,10 @@ namespace uNvEncoder
 [System.Serializable]
 public class Encoder
 {
-    public DXGI_FORMAT format = DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
-
     [System.Serializable]
     public class EncodedCallback : UnityEvent<System.IntPtr, int> {};
     public EncodedCallback onEncoded = new EncodedCallback();
+    public bool outputError = false;
 
     public int id { get; private set; } = -1;
 
@@ -20,7 +19,7 @@ public class Encoder
         get { return Lib.IsValid(id); }
     }
 
-    public int width
+    public int idth
     {
         get { return Lib.GetWidth(id); }
     }
@@ -28,6 +27,11 @@ public class Encoder
     public int height
     {
         get { return Lib.GetHeight(id); }
+    }
+
+    public Format format
+    {
+        get { return Lib.GetFormat(id); }
     }
 
     public int frameRate
@@ -47,9 +51,9 @@ public class Encoder
         }
     }
 
-    public void Create(int width, int height, int frameRate)
+    public void Create(EncoderDesc desc)
     {
-        id = Lib.CreateEncoder(width, height, format, frameRate);
+        id = Lib.Create(desc);
 
         if (!isValid)
         {
@@ -59,7 +63,14 @@ public class Encoder
 
     public void Destroy()
     {
-        Lib.DestroyEncoder(id);
+        Lib.Destroy(id);
+    }
+
+    public void Reconfigure(EncoderDesc desc)
+    {
+        // Lib.Reconfigure(id, desc);
+        Destroy();
+        Create(desc);
     }
 
     public void Update()
@@ -88,7 +99,11 @@ public class Encoder
         var ptr = texture.GetNativeTexturePtr();
         if (!Encode(ptr, forceIdrFrame))
         {
-            Debug.LogError(error);
+            var msg = error;
+            if (outputError && !string.IsNullOrEmpty(msg))
+            {
+                Debug.LogError(msg);
+            }
             return false;
         }
 
@@ -110,6 +125,29 @@ public class Encoder
         }
 
         var result = Lib.Encode(id, ptr, forceIdrFrame);
+        if (outputError && !result)
+        {
+            Debug.LogError(error);
+        }
+
+        return result;
+    }
+
+    public bool EncodeSharedHandle(System.IntPtr sharedHandle, bool forceIdrFrame)
+    {
+        if (sharedHandle == System.IntPtr.Zero)
+        {
+            Debug.LogError("The given handle is invalid.");
+            return false;
+        }
+
+        if (!isValid)
+        {
+            Debug.LogError("uNvEncoder has not been initialized yet.");
+            return false;
+        }
+
+        var result = Lib.EncodeSharedHandle(id, sharedHandle, forceIdrFrame);
         if (!result)
         {
             Debug.LogError(error);
