@@ -19,7 +19,7 @@ public class Encoder
         get { return Lib.IsValid(id); }
     }
 
-    public int idth
+    public int width
     {
         get { return Lib.GetWidth(id); }
     }
